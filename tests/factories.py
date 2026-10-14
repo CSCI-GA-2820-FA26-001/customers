@@ -1,20 +1,22 @@
 """
-Test Factory to make fake objects for testing
+Test Factory to make fake objects for testing.
 """
 
 import factory
-from service.models import YourResourceModel
+
+from service.models import Customer
 
 
-class YourResourceModelFactory(factory.Factory):
-    """Creates fake pets that you don't have to feed"""
+class CustomerFactory(factory.Factory):
+    """Creates fake customers for testing."""
 
     class Meta:  # pylint: disable=too-few-public-methods
-        """Maps factory to data model"""
+        """Maps the factory to the data model."""
 
-        model = YourResourceModel
+        model = Customer
 
-    id = factory.Sequence(lambda n: n)
-    name = factory.Faker("first_name")
-
-    # Todo: Add your other attributes here...
+    first_name = factory.Faker("first_name")
+    last_name = factory.Faker("last_name")
+    email = factory.Faker("email")
+    address = factory.Faker("address")
+    active = True

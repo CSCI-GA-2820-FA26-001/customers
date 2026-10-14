@@ -108,6 +108,11 @@ class Customer(db.Model):
                     )
 
             self.address = data.get("address")
+
+            if self.address is not None and not isinstance(self.address, str):
+                raise DataValidationError(
+                    "Invalid customer: address must be a string or None"
+                )
             self.active = data.get("active", True)
 
             if not isinstance(self.active, bool):

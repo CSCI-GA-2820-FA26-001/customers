@@ -98,6 +98,19 @@ class TestCustomer(TestCase):
         self.assertEqual(customer.address, "123 Example Street")
         self.assertTrue(customer.active)
 
+    def test_deserialize_rejects_non_string_address(self):
+        """It should reject an address that is not a string."""
+        customer = Customer()
+        data = {
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "email": "ada@example.com",
+            "address": 123,
+        }
+
+        with self.assertRaises(DataValidationError):
+            customer.deserialize(data)
+
     def test_deserialize_missing_email(self):
         """It should reject a customer without an email."""
         customer = Customer()

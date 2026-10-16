@@ -220,10 +220,10 @@ class TestCustomerService(TestCase):
         customer_id = customer.id
 
         updated = {
-            "first_name": "Grace",
-            "last_name": "Hopper",
-            "email": "grace.hopper@example.com",
-            "address": "456 Updated Ave",
+            "first_name": "Test",
+            "last_name": "User",
+            "email": "test.user@example.com",
+            "address": "1 Test St",
             "active": False,
         }
 
@@ -232,25 +232,25 @@ class TestCustomerService(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.get_json()
         self.assertEqual(data["id"], customer_id)
-        self.assertEqual(data["first_name"], "Grace")
-        self.assertEqual(data["last_name"], "Hopper")
-        self.assertEqual(data["email"], "grace.hopper@example.com")
-        self.assertEqual(data["address"], "456 Updated Ave")
+        self.assertEqual(data["first_name"], "Test")
+        self.assertEqual(data["last_name"], "User")
+        self.assertEqual(data["email"], "test.user@example.com")
+        self.assertEqual(data["address"], "1 Test St")
         self.assertFalse(data["active"])
 
         # Verify the changes were persisted.
         persisted = Customer.find(customer_id)
-        self.assertEqual(persisted.first_name, "Grace")
-        self.assertEqual(persisted.email, "grace.hopper@example.com")
+        self.assertEqual(persisted.first_name, "Test")
+        self.assertEqual(persisted.email, "test.user@example.com")
 
     def test_update_customer_not_found(self):
         """It should return 404 when updating a customer that does not exist."""
         response = self.client.put(
             "/customers/9999",
             json={
-                "first_name": "Grace",
-                "last_name": "Hopper",
-                "email": "grace.hopper@example.com",
+                "first_name": "Test",
+                "last_name": "User",
+                "email": "test.user@example.com",
             },
         )
 
@@ -267,7 +267,7 @@ class TestCustomerService(TestCase):
             f"/customers/{customer_id}",
             json={
                 "first_name": "",
-                "last_name": "Hopper",
+                "last_name": "User",
                 "email": "new@example.com",
             },
         )

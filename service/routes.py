@@ -32,11 +32,8 @@ from service.models import Customer
 ######################################################################
 @app.route("/")
 def index():
-    """Root URL response"""
-    return (
-        "Reminder: return some useful information in json format about the service here",
-        status.HTTP_200_OK,
-    )
+    """Returns useful information about the Customers service."""
+    return jsonify({"name": "Customers Service"}), status.HTTP_200_OK
 
 
 ######################################################################

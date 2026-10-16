@@ -69,9 +69,19 @@ class TestCustomerService(TestCase):
     ######################################################################
 
     def test_index(self):
-        """It should call the home page."""
+        """It should return useful JSON identifying the Customers service."""
         response = self.client.get("/")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.is_json)
+        self.assertEqual(
+            response.get_json(),
+            {"name": "Customers Service"},
+        )
+        self.assertNotIn(
+            "Reminder",
+            response.get_data(as_text=True),
+        )
 
     def test_create_customer_unsupported_media_type(self):
         """It should reject requests that are not JSON."""
@@ -211,7 +221,7 @@ class TestCustomerService(TestCase):
         """Return 404 if customer does not exist"""
         response = self.client.get("/customers/99999")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.get_json(), {"error": "Customer not found"}, )
+        self.assertEqual(response.get_json(), {"error": "Customer not found"})
 
     def test_update_customer(self):
         """It should update an existing customer."""

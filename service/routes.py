@@ -60,6 +60,19 @@ def create_customer():
     )
 
 
+######################################################################
+# LIST ALL CUSTOMERS
+######################################################################
+@app.route("/customers", methods=["GET"])
+def list_customers():
+    """Returns a list of all Customers"""
+    app.logger.info("Request to list all Customers")
+    customers = Customer.all()
+    results = [customer.serialize() for customer in customers]
+    app.logger.info("Returning %d customers", len(results))
+    return jsonify(results), status.HTTP_200_OK
+
+
 @app.route("/customers/<int:customer_id>", methods=["GET"])
 def read_customer(customer_id):
     """Retrieve a customer by ID"""

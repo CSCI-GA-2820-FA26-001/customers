@@ -21,7 +21,8 @@ This service implements a REST API that allows you to Create, Read, Update
 and Delete Customer.
 """
 
-from flask import current_app as app, jsonify, request
+from flask import abort, current_app as app, jsonify, request
+
 from service.common import status
 from service.models import Customer
 
@@ -81,4 +82,25 @@ def read_customer(customer_id):
     if customer is None:
         return jsonify({"error": "Customer not found"}), status.HTTP_404_NOT_FOUND
 
+    return jsonify(customer.serialize()), status.HTTP_200_OK
+
+
+@app.route("/customers/<int:customer_id>", methods=["PUT"])
+def update_customer(customer_id):
+    """Updates an existing customer and returns the updated resource."""
+    app.logger.info("Request to update customer with id: %s", customer_id)
+
+    data = request.get_json()
+
+    customer = Customer.find(customer_id)
+    if not customer:
+        abort(
+            status.HTTP_404_NOT_FOUND,
+            f"Customer with id '{customer_id}' was not found.",
+        )
+
+    customer.deserialize(data)
+    customer.update()
+
+    app.logger.info("Customer with id [%s] updated.", customer.id)
     return jsonify(customer.serialize()), status.HTTP_200_OK

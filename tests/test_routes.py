@@ -212,3 +212,69 @@ class TestCustomerService(TestCase):
         response = self.client.get("/customers/99999")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.get_json(), {"error": "Customer not found"}, )
+
+    def test_update_customer(self):
+        """It should update an existing customer."""
+        customer = CustomerFactory()
+        customer.create()
+        customer_id = customer.id
+
+        updated = {
+            "first_name": "Grace",
+            "last_name": "Hopper",
+            "email": "grace.hopper@example.com",
+            "address": "456 Updated Ave",
+            "active": False,
+        }
+
+        response = self.client.put(f"/customers/{customer_id}", json=updated)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data["id"], customer_id)
+        self.assertEqual(data["first_name"], "Grace")
+        self.assertEqual(data["last_name"], "Hopper")
+        self.assertEqual(data["email"], "grace.hopper@example.com")
+        self.assertEqual(data["address"], "456 Updated Ave")
+        self.assertFalse(data["active"])
+
+        # Verify the changes were persisted.
+        persisted = Customer.find(customer_id)
+        self.assertEqual(persisted.first_name, "Grace")
+        self.assertEqual(persisted.email, "grace.hopper@example.com")
+
+    def test_update_customer_not_found(self):
+        """It should return 404 when updating a customer that does not exist."""
+        response = self.client.put(
+            "/customers/9999",
+            json={
+                "first_name": "Grace",
+                "last_name": "Hopper",
+                "email": "grace.hopper@example.com",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_update_customer_invalid_data(self):
+        """It should reject invalid updates without modifying the customer."""
+        customer = CustomerFactory()
+        customer.create()
+        customer_id = customer.id
+        original_email = customer.email
+
+        response = self.client.put(
+            f"/customers/{customer_id}",
+            json={
+                "first_name": "",
+                "last_name": "Hopper",
+                "email": "new@example.com",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # The failed update must not change the persisted record.
+        db.session.rollback()
+        persisted = Customer.find(customer_id)
+        self.assertEqual(persisted.email, original_email)

@@ -22,7 +22,6 @@ and Delete Customer.
 """
 
 from flask import current_app as app, jsonify, request
-
 from service.common import status
 from service.models import Customer
 
@@ -59,3 +58,14 @@ def create_customer():
         status.HTTP_201_CREATED,
         {"Location": location_url},
     )
+
+
+@app.route("/customers/<int:customer_id>", methods=["GET"])
+def read_customer(customer_id):
+    """Retrieve a customer by ID"""
+    app.logger.info("Request to read customer with ID %s", customer_id)
+    customer = Customer.find(customer_id)
+    if customer is None:
+        return jsonify({"error": "Customer not found"}), status.HTTP_404_NOT_FOUND
+
+    return jsonify(customer.serialize()), status.HTTP_200_OK

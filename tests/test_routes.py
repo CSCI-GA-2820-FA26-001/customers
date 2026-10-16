@@ -153,3 +153,29 @@ class TestCustomerService(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Customer.query.count(), 0)
+
+    def test_read_customer(self):
+        """Read a single customer"""
+        customer = Customer(
+            first_name="Jane",
+            last_name="Doe",
+            email="janedoe@gmail.com",
+            address="123 Main St",
+            active=True,
+        )
+        customer.create()
+        response = self.client.get(f"/customers/{customer.id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(data["id"], customer.id)
+        self.assertEqual(data["first_name"], customer.first_name)
+        self.assertEqual(data["last_name"], customer.last_name)
+        self.assertEqual(data["email"], customer.email)
+        self.assertEqual(data["address"], customer.address)
+        self.assertEqual(data["active"], customer.active)
+
+    def test_read_customer_not_found(self):
+        """Return 404 if customer does not exist"""
+        response = self.client.get("/customers/99999")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.get_json(), {"error": "Customer not found"}, )

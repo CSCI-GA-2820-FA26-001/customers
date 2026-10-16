@@ -163,18 +163,26 @@ class TestCustomerService(TestCase):
         self.assertEqual(resp.get_json(), [])
 
     def test_list_customers(self):
-        """It should return all persisted customers"""
+        """It should return all persisted customers."""
         # Create five customers in the database
+        customers = []
         for _ in range(5):
-            CustomerFactory().create()
+            customer = CustomerFactory()
+            customer.create()
+            customers.append(customer)
 
-        resp = self.client.get("/customers")
+        response = self.client.get("/customers")
 
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        data = resp.get_json()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = response.get_json()
+        self.assertIsInstance(data, list)
         self.assertEqual(len(data), 5)
 
-        # The response should contain the persisted customer attributes
-        expected = sorted(customer.email for customer in Customer.all())
-        returned = sorted(customer["email"] for customer in data)
+        expected = sorted(
+            (customer.serialize() for customer in customers),
+            key=lambda customer: customer["email"],
+        )
+        returned = sorted(data, key=lambda customer: customer["email"])
+
         self.assertEqual(returned, expected)

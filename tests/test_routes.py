@@ -56,7 +56,7 @@ class TestCustomerService(TestCase):
     def setUp(self):
         """Runs before each test"""
         self.client = app.test_client()
-        db.session.query(Customer).delete()  # clean up the last tests
+        db.session.query(Customer).delete()
         db.session.commit()
 
     def tearDown(self):
@@ -64,13 +64,95 @@ class TestCustomerService(TestCase):
         db.session.remove()
 
     ######################################################################
-    #  P L A C E   T E S T   C A S E S   H E R E
+    #  T E S T   C A S E S
     ######################################################################
 
     def test_index(self):
-        """It should call the home page"""
-        resp = self.client.get("/")
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        """It should call the home page."""
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_create_customer_unsupported_media_type(self):
+        """It should reject requests that are not JSON."""
+        response = self.client.post(
+            "/customers",
+            data="not JSON",
+            content_type="text/plain",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        )
+        self.assertEqual(Customer.query.count(), 0)
+
+    def test_create_customer(self):
+        """It should create a customer and return 201 Created."""
+        payload = {
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "email": "ada.lovelace@example.com",
+            "address": "123 Analytical Engine Way",
+            "active": True,
+        }
+
+        response = self.client.post("/customers", json=payload)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        data = response.get_json()
+        self.assertIsNotNone(data["id"])
+        self.assertEqual(data["first_name"], payload["first_name"])
+        self.assertEqual(data["last_name"], payload["last_name"])
+        self.assertEqual(data["email"], payload["email"])
+        self.assertEqual(data["address"], payload["address"])
+        self.assertEqual(data["active"], payload["active"])
+
+        self.assertIn("Location", response.headers)
+        self.assertTrue(
+            response.headers["Location"].endswith(f"/customers/{data['id']}")
+        )
+
+        # Verify the customer was persisted.
+        customer = Customer.find(data["id"])
+        self.assertIsNotNone(customer)
+        self.assertEqual(customer.email, payload["email"])
+
+    def test_create_customer_with_optional_fields_omitted(self):
+        """It should default address to None and active to True."""
+        payload = {
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "email": "ada.lovelace@example.com",
+        }
+
+        response = self.client.post("/customers", json=payload)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        data = response.get_json()
+        self.assertIsNotNone(data["id"])
+        self.assertIsNone(data["address"])
+        self.assertTrue(data["active"])
+
+        # Verify the defaults were persisted.
+        customer = Customer.find(data["id"])
+        self.assertIsNotNone(customer)
+        self.assertIsNone(customer.address)
+        self.assertTrue(customer.active)
+
+    def test_create_customer_invalid_data(self):
+        """It should reject invalid customer data without persisting it."""
+        payload = {
+            "first_name": "",
+            "last_name": "Lovelace",
+            "email": "ada.lovelace@example.com",
+        }
+
+        response = self.client.post("/customers", json=payload)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Customer.query.count(), 0)
 
     def test_read_customer(self):
         """Read a single customer"""

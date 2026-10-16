@@ -25,6 +25,7 @@ from unittest import TestCase
 from wsgi import app
 from service.common import status
 from service.models import db, Customer
+from .factories import CustomerFactory
 
 DATABASE_URI = os.getenv(
     "DATABASE_URI", "postgresql+psycopg://postgres:postgres@localhost:5432/testdb"
@@ -72,4 +73,26 @@ class TestCustomerService(TestCase):
         resp = self.client.get("/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
-    # Todo: Add your test cases here...
+    def test_list_customers_empty(self):
+        """It should return an empty list when no customers exist"""
+        resp = self.client.get("/customers")
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.get_json(), [])
+
+    def test_list_customers(self):
+        """It should return all persisted customers"""
+        # Create five customers in the database
+        for _ in range(5):
+            CustomerFactory().create()
+
+        resp = self.client.get("/customers")
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        data = resp.get_json()
+        self.assertEqual(len(data), 5)
+
+        # The response should contain the persisted customer attributes
+        expected = sorted(customer.email for customer in Customer.all())
+        returned = sorted(customer["email"] for customer in data)
+        self.assertEqual(returned, expected)

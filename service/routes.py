@@ -21,8 +21,10 @@ This service implements a REST API that allows you to Create, Read, Update
 and Delete Customer
 """
 
+from flask import jsonify
 from flask import current_app as app  # Import Flask application
 from service.common import status  # HTTP Status Codes
+from service.models import Customer
 
 
 ######################################################################
@@ -41,4 +43,15 @@ def index():
 #  R E S T   A P I   E N D P O I N T S
 ######################################################################
 
-# Todo: Place your REST API code here ...
+
+######################################################################
+# LIST ALL CUSTOMERS
+######################################################################
+@app.route("/customers", methods=["GET"])
+def list_customers():
+    """Returns a list of all Customers"""
+    app.logger.info("Request to list all Customers")
+    customers = Customer.all()
+    results = [customer.serialize() for customer in customers]
+    app.logger.info("Returning %d customers", len(results))
+    return jsonify(results), status.HTTP_200_OK

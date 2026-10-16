@@ -178,3 +178,4 @@ class TestCustomerService(TestCase):
         """Return 404 if customer does not exist"""
         response = self.client.get("/customers/99999")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.get_json(), {"error": "Customer not found"}, )

@@ -101,3 +101,24 @@ def update_customer(customer_id):
 
     app.logger.info("Customer with id [%s] updated.", customer.id)
     return jsonify(customer.serialize()), status.HTTP_200_OK
+
+
+######################################################################
+# DELETE A CUSTOMER
+######################################################################
+@app.route("/customers/<int:customer_id>", methods=["DELETE"])
+def delete_customer(customer_id):
+    """Deletes a customer by ID."""
+    app.logger.info("Request to delete customer with id: %s", customer_id)
+
+    customer = Customer.find(customer_id)
+    if customer is None:
+        abort(
+            status.HTTP_404_NOT_FOUND,
+            f"Customer with id '{customer_id}' was not found.",
+        )
+
+    customer.delete()
+
+    app.logger.info("Customer with id [%s] deleted.", customer_id)
+    return "", status.HTTP_204_NO_CONTENT

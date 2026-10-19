@@ -288,3 +288,57 @@ class TestCustomerService(TestCase):
         db.session.rollback()
         persisted = Customer.find(customer_id)
         self.assertEqual(persisted.email, original_email)
+
+    def test_delete_customer(self):
+        """It should delete a customer without changing other customers."""
+        customer = CustomerFactory()
+        customer.create()
+        customer_id = customer.id
+
+        other = CustomerFactory()
+        other.create()
+        other_id = other.id
+        original_other = other.serialize()
+
+        response = self.client.delete(f"/customers/{customer_id}")
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data, b"")
+
+        # Verify the customer was actually deleted.
+        response = self.client.get(f"/customers/{customer_id}")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIsNone(Customer.find(customer_id))
+
+        # Verify the other customer was not modified.
+        response = self.client.get(f"/customers/{other_id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json(), original_other)
+        self.assertEqual(Customer.query.count(), 1)
+
+    def test_delete_customer_not_found(self):
+        """It should report a missing customer without modifying other data."""
+        customer = CustomerFactory()
+        customer.create()
+        original = customer.serialize()
+        missing_id = customer.id + 1
+
+        response = self.client.delete(f"/customers/{missing_id}")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(response.is_json)
+        self.assertEqual(Customer.query.count(), 1)
+        self.assertEqual(Customer.find(customer.id).serialize(), original)
+
+    def test_delete_customer_twice(self):
+        """It should report not found when deleting an already deleted customer."""
+        customer = CustomerFactory()
+        customer.create()
+        customer_id = customer.id
+
+        response = self.client.delete(f"/customers/{customer_id}")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        response = self.client.delete(f"/customers/{customer_id}")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(Customer.query.count(), 0)

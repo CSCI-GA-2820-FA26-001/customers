@@ -117,3 +117,47 @@ def delete_customer(customer_id):
         app.logger.info("Customer with id [%s] deleted.", customer_id)
 
     return "", status.HTTP_204_NO_CONTENT
+
+
+######################################################################
+# ACTION: ACTIVATE A CUSTOMER
+######################################################################
+@app.route("/customers/<int:customer_id>/activate", methods=["PUT"])
+def activate_customer(customer_id):
+    """Activates a customer (sets active to True)."""
+    app.logger.info("Request to activate customer with id: %s", customer_id)
+
+    customer = Customer.find(customer_id)
+    if not customer:
+        abort(
+            status.HTTP_404_NOT_FOUND,
+            f"Customer with id '{customer_id}' was not found.",
+        )
+
+    customer.active = True
+    customer.update()
+
+    app.logger.info("Customer with id [%s] activated.", customer_id)
+    return jsonify(customer.serialize()), status.HTTP_200_OK
+
+
+######################################################################
+# ACTION: DEACTIVATE A CUSTOMER
+######################################################################
+@app.route("/customers/<int:customer_id>/deactivate", methods=["PUT"])
+def deactivate_customer(customer_id):
+    """Deactivates a customer (sets active to False)."""
+    app.logger.info("Request to deactivate customer with id: %s", customer_id)
+
+    customer = Customer.find(customer_id)
+    if not customer:
+        abort(
+            status.HTTP_404_NOT_FOUND,
+            f"Customer with id '{customer_id}' was not found.",
+        )
+
+    customer.active = False
+    customer.update()
+
+    app.logger.info("Customer with id [%s] deactivated.", customer_id)
+    return jsonify(customer.serialize()), status.HTTP_200_OK

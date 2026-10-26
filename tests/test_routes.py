@@ -22,6 +22,7 @@ TestCustomer API Service Test Suite
 import os
 import logging
 from unittest import TestCase
+
 from wsgi import app
 from service.common import status
 from service.models import db, Customer
@@ -166,15 +167,15 @@ class TestCustomerService(TestCase):
         self.assertEqual(Customer.query.count(), 0)
 
     def test_list_customers_empty(self):
-        """It should return an empty list when no customers exist"""
-        resp = self.client.get("/customers")
+        """It should return an empty list when no customers exist."""
+        response = self.client.get("/customers")
 
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp.get_json(), [])
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json(), [])
 
     def test_list_customers(self):
         """It should return all persisted customers."""
-        # Create five customers in the database
+        # Create five customers in the database.
         customers = []
         for _ in range(5):
             customer = CustomerFactory()
@@ -198,7 +199,7 @@ class TestCustomerService(TestCase):
         self.assertEqual(returned, expected)
 
     def test_read_customer(self):
-        """Read a single customer"""
+        """Read a single customer."""
         customer = Customer(
             first_name="Jane",
             last_name="Doe",
@@ -207,7 +208,9 @@ class TestCustomerService(TestCase):
             active=True,
         )
         customer.create()
+
         response = self.client.get(f"/customers/{customer.id}")
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.get_json()
         self.assertEqual(data["id"], customer.id)
@@ -218,8 +221,9 @@ class TestCustomerService(TestCase):
         self.assertEqual(data["active"], customer.active)
 
     def test_read_customer_not_found(self):
-        """Return 404 if customer does not exist"""
+        """Return 404 if customer does not exist."""
         response = self.client.get("/customers/99999")
+
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.get_json(), {"error": "Customer not found"})
 
@@ -317,7 +321,7 @@ class TestCustomerService(TestCase):
         self.assertEqual(Customer.query.count(), 1)
 
     def test_delete_customer_not_found(self):
-        """It should report a missing customer without modifying other data."""
+        """It should return 204 when the customer does not exist."""
         customer = CustomerFactory()
         customer.create()
         original = customer.serialize()
@@ -325,20 +329,22 @@ class TestCustomerService(TestCase):
 
         response = self.client.delete(f"/customers/{missing_id}")
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertTrue(response.is_json)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data, b"")
         self.assertEqual(Customer.query.count(), 1)
         self.assertEqual(Customer.find(customer.id).serialize(), original)
 
     def test_delete_customer_twice(self):
-        """It should report not found when deleting an already deleted customer."""
+        """It should return 204 when deleting the same customer twice."""
         customer = CustomerFactory()
         customer.create()
         customer_id = customer.id
 
         response = self.client.delete(f"/customers/{customer_id}")
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data, b"")
 
         response = self.client.delete(f"/customers/{customer_id}")
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.data, b"")
         self.assertEqual(Customer.query.count(), 0)

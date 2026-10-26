@@ -112,13 +112,8 @@ def delete_customer(customer_id):
     app.logger.info("Request to delete customer with id: %s", customer_id)
 
     customer = Customer.find(customer_id)
-    if customer is None:
-        abort(
-            status.HTTP_404_NOT_FOUND,
-            f"Customer with id '{customer_id}' was not found.",
-        )
+    if customer is not None:
+        customer.delete()
+        app.logger.info("Customer with id [%s] deleted.", customer_id)
 
-    customer.delete()
-
-    app.logger.info("Customer with id [%s] deleted.", customer_id)
     return "", status.HTTP_204_NO_CONTENT

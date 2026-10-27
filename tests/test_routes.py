@@ -84,6 +84,14 @@ class TestCustomerService(TestCase):
             response.get_data(as_text=True),
         )
 
+    def test_health(self):
+        """It should return the health status of the service."""
+        response = self.client.get("/health")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.is_json)
+        self.assertEqual(response.get_json(), {"status": "OK"})
+
     def test_create_customer_unsupported_media_type(self):
         """It should reject requests that are not JSON."""
         response = self.client.post(

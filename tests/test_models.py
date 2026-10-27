@@ -321,3 +321,43 @@ class TestCustomer(TestCase):
                 customer.delete()
 
         mock_rollback.assert_called_once()
+
+    def test_find_by_first_name(self):
+        """It should find customers by first name."""
+        CustomerFactory(first_name="Ada").create()
+        CustomerFactory(first_name="Grace").create()
+
+        customers = Customer.find_by_first_name("Ada").all()
+
+        self.assertEqual(len(customers), 1)
+        self.assertEqual(customers[0].first_name, "Ada")
+
+    def test_find_by_last_name(self):
+        """It should find customers by last name."""
+        CustomerFactory(last_name="Smith").create()
+        CustomerFactory(last_name="Jones").create()
+
+        customers = Customer.find_by_last_name("Smith").all()
+
+        self.assertEqual(len(customers), 1)
+        self.assertEqual(customers[0].last_name, "Smith")
+
+    def test_find_by_email(self):
+        """It should find customers by email."""
+        CustomerFactory(email="ada@example.com").create()
+        CustomerFactory(email="grace@example.com").create()
+
+        customers = Customer.find_by_email("ada@example.com").all()
+
+        self.assertEqual(len(customers), 1)
+        self.assertEqual(customers[0].email, "ada@example.com")
+
+    def test_find_by_active(self):
+        """It should find customers by active status."""
+        CustomerFactory(active=True).create()
+        CustomerFactory(active=False).create()
+
+        customers = Customer.find_by_active(False).all()
+
+        self.assertEqual(len(customers), 1)
+        self.assertFalse(customers[0].active)

@@ -65,7 +65,22 @@ def create_customer():
 def list_customers():
     """Returns a list of all Customers"""
     app.logger.info("Request to list all Customers")
-    customers = Customer.all()
+    first_name = request.args.get("first_name")
+    last_name = request.args.get("last_name")
+    email = request.args.get("email")
+    active = request.args.get("active")
+
+    if first_name is not None:
+        customers = Customer.find_by_first_name(first_name)
+    elif last_name is not None:
+        customers = Customer.find_by_last_name(last_name)
+    elif email is not None:
+        customers = Customer.find_by_email(email)
+    elif active is not None:
+        customers = Customer.find_by_active(active.lower() == "true")
+    else:
+        customers = Customer.all()
+
     results = [customer.serialize() for customer in customers]
     app.logger.info("Returning %d customers", len(results))
     return jsonify(results), status.HTTP_200_OK

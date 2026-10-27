@@ -150,3 +150,21 @@ class Customer(db.Model):
         """Returns customers matching the given email address."""
         logger.info("Processing customer query for email %s", email)
         return cls.query.filter(cls.email == email)
+
+    @classmethod
+    def find_by_first_name(cls, first_name):
+        """Returns customers matching the given first name."""
+        logger.info("Processing customer query for first name %s", first_name)
+        return cls.query.filter(cls.first_name == first_name)
+
+    @classmethod
+    def find_by_last_name(cls, last_name):
+        """Returns customers matching the given last name."""
+        logger.info("Processing customer query for last name %s", last_name)
+        return cls.query.filter(cls.last_name == last_name)
+
+    @classmethod
+    def find_by_active(cls, active):
+        """Returns customers matching the given active status."""
+        logger.info("Processing customer query for active status %s", active)
+        return cls.query.filter(cls.active == active)

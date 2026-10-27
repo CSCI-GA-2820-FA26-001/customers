@@ -197,6 +197,63 @@ class TestCustomerService(TestCase):
 
         self.assertEqual(returned, expected)
 
+    def test_query_customers_by_first_name(self):
+        """It should return customers matching a first name."""
+        CustomerFactory(first_name="Ada").create()
+        CustomerFactory(first_name="Grace").create()
+
+        response = self.client.get("/customers?first_name=Ada")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["first_name"], "Ada")
+
+    def test_query_customers_by_last_name(self):
+        """It should return customers matching a last name."""
+        CustomerFactory(last_name="Smith").create()
+        CustomerFactory(last_name="Jones").create()
+
+        response = self.client.get("/customers?last_name=Smith")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["last_name"], "Smith")
+
+    def test_query_customers_by_email(self):
+        """It should return customers matching an email."""
+        CustomerFactory(email="ada@example.com").create()
+        CustomerFactory(email="grace@example.com").create()
+
+        response = self.client.get("/customers?email=ada@example.com")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]["email"], "ada@example.com")
+
+    def test_query_customers_by_active(self):
+        """It should return customers matching their active status."""
+        CustomerFactory(active=True).create()
+        CustomerFactory(active=False).create()
+
+        response = self.client.get("/customers?active=false")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), 1)
+        self.assertFalse(data[0]["active"])
+
+    def test_query_customers_no_match(self):
+        """It should return an empty list when no customers match."""
+        CustomerFactory(first_name="Ada").create()
+
+        response = self.client.get("/customers?first_name=Nobody")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json(), [])
+
     def test_read_customer(self):
         """Read a single customer"""
         customer = Customer(

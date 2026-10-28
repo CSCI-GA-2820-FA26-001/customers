@@ -1,0 +1,92 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: customers-pipeline
+spec:
+  description: >-
+    Clone the Customers repository, run lint and unit tests
+    in parallel, build and push an image, then deploy it.
+
+  params:
+    - name: repo-url
+      type: string
+      default: https://github.com/CSCI-GA-2820-FA26-001/customers.git
+
+    - name: revision
+      type: string
+      default: master
+
+    - name: image
+      type: string
+      description: Fully qualified image name with a unique tag.
+
+    - name: deployment-name
+      type: string
+      description: Deployment metadata.name in k8s/deployment.yaml.
+
+    - name: container-name
+      type: string
+      description: Application container name in k8s/deployment.yaml.
+
+  workspaces:
+    - name: shared-workspace
+
+  tasks:
+    - name: clone
+      taskRef:
+        name: customers-clone
+      params:
+        - name: repo-url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.revision)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    - name: lint
+      runAfter:
+        - clone
+      taskRef:
+        name: customers-lint
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    - name: test
+      runAfter:
+        - clone
+      taskRef:
+        name: customers-test
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    - name: build
+      runAfter:
+        - lint
+        - test
+      taskRef:
+        name: customers-build
+      params:
+        - name: image
+          value: $(params.image)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+    - name: deploy
+      runAfter:
+        - build
+      taskRef:
+        name: customers-deploy
+      params:
+        - name: image
+          value: $(params.image)
+        - name: deployment-name
+          value: $(params.deployment-name)
+        - name: container-name
+          value: $(params.container-name)
+      workspaces:
+        - name: source
+          workspace: shared-workspace

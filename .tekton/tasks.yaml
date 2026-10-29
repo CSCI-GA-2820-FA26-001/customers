@@ -1,0 +1,204 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: customers-clone
+spec:
+  params:
+    - name: repo-url
+      type: string
+    - name: revision
+      type: string
+      default: master
+  workspaces:
+    - name: source
+  steps:
+    - name: clone
+      image: docker.io/alpine/git:latest
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: HOME
+          value: /tmp
+        - name: REPO_URL
+          value: $(params.repo-url)
+        - name: REVISION
+          value: $(params.revision)
+      script: |
+        #!/bin/sh
+        set -eu
+
+        mkdir -p repo
+        cd repo
+
+        git config --global --add safe.directory "$PWD"
+        git init
+        git fetch --depth=1 "$REPO_URL" "$REVISION"
+        git checkout --force --detach FETCH_HEAD
+        git log -1 --oneline
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: customers-lint
+spec:
+  workspaces:
+    - name: source
+  steps:
+    - name: lint
+      image: docker.io/library/python:3.12-slim
+      workingDir: $(workspaces.source.path)/repo
+      env:
+        - name: HOME
+          value: /tmp
+      script: |
+        #!/bin/sh
+        set -eu
+
+        python -m venv /tmp/lint-venv
+        . /tmp/lint-venv/bin/activate
+
+        pip install pipenv
+        pipenv requirements --dev > /tmp/lint-requirements.txt
+        pip install -r /tmp/lint-requirements.txt
+
+        flake8 service tests \
+          --count \
+          --select=E9,F63,F7,F82 \
+          --show-source \
+          --statistics
+
+        flake8 service tests \
+          --count \
+          --max-complexity=10 \
+          --max-line-length=127 \
+          --statistics
+
+        pylint service tests --max-line-length=127
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: customers-test
+spec:
+  workspaces:
+    - name: source
+  steps:
+    - name: test
+      image: docker.io/library/python:3.12-slim
+      workingDir: $(workspaces.source.path)/repo
+      env:
+        - name: HOME
+          value: /tmp
+        - name: RETRY_COUNT
+          value: "1"
+        - name: DATABASE_URI
+          valueFrom:
+            secretKeyRef:
+              name: customers-test-db
+              key: database_uri
+      script: |
+        #!/bin/sh
+        set -eu
+
+        python -m venv /tmp/test-venv
+        . /tmp/test-venv/bin/activate
+
+        pip install pipenv
+        pipenv requirements --dev > /tmp/test-requirements.txt
+        pip install -r /tmp/test-requirements.txt
+
+        pytest \
+          --pspec \
+          --cov=service \
+          --cov-fail-under=95 \
+          --disable-warnings
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: customers-build
+spec:
+  params:
+    - name: image
+      type: string
+  workspaces:
+    - name: source
+  steps:
+    - name: build-and-push
+      image: quay.io/buildah/stable:latest
+      workingDir: $(workspaces.source.path)/repo
+      securityContext:
+        privileged: true
+        runAsUser: 0
+      env:
+        - name: HOME
+          value: /tekton/home
+        - name: IMAGE
+          value: $(params.image)
+      script: |
+        #!/bin/sh
+        set -eu
+
+        test -f Dockerfile
+
+        buildah --storage-driver=vfs bud \
+          --isolation=chroot \
+          --format=docker \
+          --file Dockerfile \
+          --tag "$IMAGE" \
+          .
+
+        buildah --storage-driver=vfs push \
+          "$IMAGE" \
+          "docker://$IMAGE"
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: customers-deploy
+spec:
+  params:
+    - name: image
+      type: string
+    - name: deployment-name
+      type: string
+    - name: container-name
+      type: string
+  workspaces:
+    - name: source
+  steps:
+    - name: deploy
+      image: quay.io/openshift/origin-cli:latest
+      workingDir: $(workspaces.source.path)/repo
+      env:
+        - name: HOME
+          value: /tmp
+        - name: IMAGE
+          value: $(params.image)
+        - name: DEPLOYMENT_NAME
+          value: $(params.deployment-name)
+        - name: CONTAINER_NAME
+          value: $(params.container-name)
+      script: |
+        #!/bin/sh
+        set -eu
+
+        test -f k8s/deployment.yaml
+        test -f k8s/service.yaml
+
+        oc apply -f k8s/service.yaml
+
+        oc set image \
+          --local \
+          -f k8s/deployment.yaml \
+          "$CONTAINER_NAME=$IMAGE" \
+          -o yaml > /tmp/customers-deployment.yaml
+
+        oc apply -f /tmp/customers-deployment.yaml
+
+        oc rollout status \
+          "deployment/$DEPLOYMENT_NAME" \
+          --timeout=180s

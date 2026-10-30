@@ -1,9 +1,21 @@
 
 # These can be overridden with environment variables or command-line variables.
+
+# Registry address used by Kubernetes inside the k3d network.
 REGISTRY ?= cluster-registry:5000
+
+# Host-mapped registry address used by Docker running in WSL.
+PUSH_REGISTRY ?= 127.0.0.1:5000
+
 IMAGE_NAME ?= customers
 IMAGE_TAG ?= 1.0
+
+# Image reference used by the Kubernetes manifests.
 IMAGE ?= $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
+
+# Image reference used when pushing from the development environment.
+PUSH_IMAGE ?= $(PUSH_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
+
 PLATFORM ?= "linux/amd64,linux/arm64"
 CLUSTER ?= nyu-devops
 KUBECTL_CONTEXT ?= k3d-$(CLUSTER)
@@ -25,6 +37,7 @@ all: help
 clean: ## Remove dangling build cache and the current image.
 	$(info Removing dangling build cache...)
 	-docker rmi $(IMAGE)
+	-docker rmi $(PUSH_IMAGE)
 	docker image prune -f
 	docker buildx prune -f
 
@@ -111,9 +124,11 @@ build: ## Build the project container image for the local platform.
 	docker build --rm --pull --tag $(IMAGE) .
 
 .PHONY: push
-push: ## Push the image to the container registry.
-	$(info Pushing $(IMAGE)...)
-	docker push $(IMAGE)
+push: ## Tag and push the image to the host-accessible registry.
+	$(info Tagging $(IMAGE) as $(PUSH_IMAGE)...)
+	docker tag $(IMAGE) $(PUSH_IMAGE)
+	$(info Pushing $(PUSH_IMAGE)...)
+	docker push $(PUSH_IMAGE)
 
 .PHONY: buildx
 buildx: ## Build and push a multi-platform image.

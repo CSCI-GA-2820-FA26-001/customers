@@ -17,6 +17,8 @@ def before_all(context):
 def before_scenario(context, scenario):
     """Initialize a browser for each scenario."""
     assert context.bdd_environment_ready is True
+    if scenario.feature.filename.endswith("deployed_service.feature"):
+        return
 
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")

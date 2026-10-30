@@ -1,0 +1,25 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: Trigger
+metadata:
+  name: customers-trigger
+spec:
+  interceptors:
+    - ref:
+        name: github
+      params:
+        - name: secretRef
+          value:
+            secretName: github-webhook-secret
+            secretKey: secretToken
+        - name: eventTypes
+          value:
+            - push
+    - ref:
+        name: cel
+      params:
+        - name: filter
+          value: "body.ref == 'refs/heads/master'"
+  bindings:
+    - ref: customers-binding
+  template:
+    ref: customers-template

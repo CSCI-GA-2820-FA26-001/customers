@@ -1,0 +1,15 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: customers-listener
+  labels:
+    app.kubernetes.io/part-of: customers
+spec:
+  to:
+    kind: Service
+    name: el-customers-listener
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

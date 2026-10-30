@@ -167,6 +167,9 @@ spec:
       type: string
     - name: container-name
       type: string
+  results:
+    - name: base-url
+      description: Public URL of the deployed Customers service.
   workspaces:
     - name: source
   steps:
@@ -202,3 +205,42 @@ spec:
         oc rollout status \
           "deployment/$DEPLOYMENT_NAME" \
           --timeout=180s
+
+        oc apply -f k8s/route.yaml
+
+        ROUTE_HOST=$(oc get route customers -o jsonpath='{.spec.host}')
+        test -n "$ROUTE_HOST"
+        printf 'https://%s' "$ROUTE_HOST" > "$(results.base-url.path)"
+
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: customers-bdd
+spec:
+  description: Run BDD tests against the deployed Customers service.
+  params:
+    - name: base-url
+      type: string
+      description: Public URL of the deployed Customers service.
+  workspaces:
+    - name: source
+  steps:
+    - name: behave
+      image: quay.io/rofrano/pipeline-selenium
+      workingDir: $(workspaces.source.path)/repo
+      env:
+        - name: BASE_URL
+          value: $(params.base-url)
+      script: |
+        #!/bin/bash
+        set -e
+        export PATH=$PATH:$HOME/.local/bin
+
+        echo "***** Installing dependencies *****"
+        python -m pip install --upgrade pip pipenv
+        pipenv requirements --dev > /tmp/bdd-requirements.txt
+        python -m pip install --user -r /tmp/bdd-requirements.txt
+
+        echo "***** Running BDD Tests *****"
+        behave

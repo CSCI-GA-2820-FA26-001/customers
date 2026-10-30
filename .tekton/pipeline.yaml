@@ -90,3 +90,15 @@ spec:
       workspaces:
         - name: source
           workspace: shared-workspace
+
+    - name: bdd
+      runAfter:
+        - deploy
+      taskRef:
+        name: customers-bdd
+      params:
+        - name: base-url
+          value: $(tasks.deploy.results.base-url)
+      workspaces:
+        - name: source
+          workspace: shared-workspace

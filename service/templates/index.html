@@ -215,10 +215,30 @@
         font-weight: 400;
         font-size: 0.75rem;
       }
-      .placeholder-note {
-        color: var(--slate-400);
-        font-size: 0.72rem;
+      .form-status {
+        font-size: 0.85rem;
+        margin: 0.75rem 0 0;
+      }
+      .form-status.success {
+        color: var(--green-800);
+      }
+      .form-status.error {
+        color: #b71c1c;
+      }
+      .editing-banner {
+        background: var(--indigo-50);
+        color: var(--indigo-700);
+        border-radius: 8px;
+        padding: 0.5rem 0.7rem;
+        font-size: 0.78rem;
         margin: 0.25rem 0 0.75rem;
+      }
+      .form-actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+      tr.editing {
+        background: var(--indigo-50);
       }
 
       /* ---------- directory ---------- */
@@ -393,37 +413,43 @@
             <p class="muted">
               Create a customer or select an existing customer to edit.
             </p>
-            <p class="placeholder-note">
-              Form wiring arrives with the Create (#29) and Update (#28) stories.
+            <p class="editing-banner" id="editing-banner" hidden>
+              Editing a customer — make changes and Save, or Cancel.
             </p>
-            <form onsubmit="return false;">
+            <form id="customer-form" novalidate>
               <label class="field">
                 First name *
-                <input type="text" placeholder="e.g. Jordan" disabled />
+                <input type="text" id="field-first-name" placeholder="e.g. Jordan" />
               </label>
               <label class="field">
                 Last name *
-                <input type="text" placeholder="e.g. Morgan" disabled />
+                <input type="text" id="field-last-name" placeholder="e.g. Morgan" />
               </label>
               <label class="field">
                 Email address *
-                <input type="email" placeholder="jordan@example.com" disabled />
+                <input type="email" id="field-email" placeholder="jordan@example.com" />
               </label>
               <label class="field">
                 Address
-                <input type="text" placeholder="Street address" disabled />
+                <input type="text" id="field-address" placeholder="Street address" />
                 <span class="help">Optional customer address.</span>
               </label>
               <label class="field">
                 Account status
-                <select disabled>
-                  <option>Active</option>
-                  <option>Inactive</option>
+                <select id="field-active">
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
                 </select>
               </label>
-              <button class="btn primary" type="submit" disabled>
-                Save customer
-              </button>
+              <div class="form-actions">
+                <button class="btn primary" type="submit" id="save-customer" disabled>
+                  Save customer
+                </button>
+                <button class="btn" type="button" id="cancel-customer" disabled>
+                  Cancel
+                </button>
+              </div>
+              <p class="form-status" id="form-status" hidden></p>
             </form>
           </section>
 
@@ -514,6 +540,7 @@
 
         for (const customer of customers) {
           const row = document.createElement("tr");
+          row.dataset.customerId = customer.id;
 
           const nameCell = document.createElement("td");
           const name = document.createElement("div");
@@ -540,9 +567,9 @@
           const actions = document.createElement("div");
           actions.className = "actions-cell";
           const edit = document.createElement("button");
-          edit.className = "btn";
+          edit.className = "btn edit-btn";
           edit.textContent = "Edit";
-          edit.disabled = true;
+          edit.addEventListener("click", () => startEdit(customer));
           const toggle = document.createElement("button");
           toggle.className = "btn";
           toggle.textContent = customer.active ? "Deactivate" : "Activate";
@@ -605,6 +632,109 @@
           error.hidden = false;
         }
       }
+
+      let editingId = null;
+
+      function setFormStatus(message, kind) {
+        const status = document.getElementById("form-status");
+        status.textContent = message;
+        status.className = "form-status " + kind;
+        status.hidden = false;
+      }
+
+      function clearFormStatus() {
+        const status = document.getElementById("form-status");
+        status.textContent = "";
+        status.hidden = true;
+      }
+
+      function resetForm() {
+        document.getElementById("customer-form").reset();
+        editingId = null;
+        document.getElementById("save-customer").disabled = true;
+        document.getElementById("cancel-customer").disabled = true;
+        document.getElementById("editing-banner").hidden = true;
+        document
+          .querySelectorAll("#customers tbody tr.editing")
+          .forEach((row) => row.classList.remove("editing"));
+      }
+
+      function startEdit(customer) {
+        editingId = customer.id;
+        document.getElementById("field-first-name").value = customer.first_name;
+        document.getElementById("field-last-name").value = customer.last_name;
+        document.getElementById("field-email").value = customer.email;
+        document.getElementById("field-address").value = customer.address || "";
+        document.getElementById("field-active").value = String(customer.active);
+        document.getElementById("save-customer").disabled = false;
+        document.getElementById("cancel-customer").disabled = false;
+        document.getElementById("editing-banner").hidden = false;
+        clearFormStatus();
+        document
+          .querySelectorAll("#customers tbody tr.editing")
+          .forEach((row) => row.classList.remove("editing"));
+        const row = document.querySelector(
+          `#customers tbody tr[data-customer-id="${customer.id}"]`
+        );
+        if (row) {
+          row.classList.add("editing");
+        }
+        document
+          .getElementById("customer-form")
+          .scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("field-first-name").focus();
+      }
+
+      async function saveCustomer(event) {
+        event.preventDefault();
+        if (editingId === null) {
+          return;
+        }
+
+        const payload = {
+          first_name: document.getElementById("field-first-name").value.trim(),
+          last_name: document.getElementById("field-last-name").value.trim(),
+          email: document.getElementById("field-email").value.trim(),
+          address:
+            document.getElementById("field-address").value.trim() || null,
+          active: document.getElementById("field-active").value === "true",
+        };
+
+        if (!payload.first_name || !payload.last_name || !payload.email) {
+          setFormStatus(
+            "First name, last name, and email are required.",
+            "error"
+          );
+          return;
+        }
+
+        try {
+          const response = await fetch(`/customers/${editingId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            throw new Error("Request failed with status " + response.status);
+          }
+          resetForm();
+          setFormStatus("Customer updated.", "success");
+          await loadCustomers();
+        } catch (err) {
+          setFormStatus(
+            "Unable to update the customer. Please try again.",
+            "error"
+          );
+        }
+      }
+
+      document
+        .getElementById("customer-form")
+        .addEventListener("submit", saveCustomer);
+      document.getElementById("cancel-customer").addEventListener("click", () => {
+        resetForm();
+        clearFormStatus();
+      });
 
       document.getElementById("refresh").addEventListener("click", loadCustomers);
       document.getElementById("apply-filters").addEventListener("click", refreshTable);

@@ -21,7 +21,7 @@ This service implements a REST API that allows you to Create, Read, Update
 and Delete Customer.
 """
 
-from flask import abort, current_app as app, jsonify, request
+from flask import abort, current_app as app, jsonify, render_template, request
 
 from service.common import status
 from service.models import Customer
@@ -32,8 +32,8 @@ from service.models import Customer
 ######################################################################
 @app.route("/")
 def index():
-    """Returns useful information about the Customers service."""
-    return jsonify({"name": "Customers Service"}), status.HTTP_200_OK
+    """Returns the Customers admin UI."""
+    return render_template("index.html")
 
 
 ######################################################################

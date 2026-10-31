@@ -21,7 +21,7 @@ EVENTLISTENER_URL="${EVENTLISTENER_URL:?set EVENTLISTENER_URL (Route URL or http
 WEBHOOK_SECRET="${WEBHOOK_SECRET:?set WEBHOOK_SECRET to the github-webhook-secret secretToken value}"
 REPO_URL="${REPO_URL:-https://github.com/CSCI-GA-2820-FA26-001/customers.git}"
 REF="${REF:-refs/heads/master}"
-REVISION="${REVISION:-$(git rev-parse origin/master 2>/dev/null || echo master)}"
+REVISION="${REVISION:-$(git rev-parse origin/master)}"
 
 payload=$(cat <<JSON
 {
@@ -47,7 +47,7 @@ echo "  ref:            ${REF}"
 echo "  after:          ${REVISION}"
 echo
 
-curl --silent --show-error \
+curl --silent --show-error --fail-with-body \
   -X POST "${EVENTLISTENER_URL}" \
   -H "Content-Type: application/json" \
   -H "X-GitHub-Event: push" \

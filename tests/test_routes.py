@@ -70,19 +70,15 @@ class TestCustomerService(TestCase):
     ######################################################################
 
     def test_index(self):
-        """It should return useful JSON identifying the Customers service."""
+        """It should return the Customers admin UI page."""
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.is_json)
-        self.assertEqual(
-            response.get_json(),
-            {"name": "Customers Service"},
-        )
-        self.assertNotIn(
-            "Reminder",
-            response.get_data(as_text=True),
-        )
+        self.assertIn("text/html", response.content_type)
+        body = response.get_data(as_text=True)
+        self.assertIn("Customers", body)
+        self.assertIn("No customers available", body)
+        self.assertNotIn("Reminder", body)
 
     def test_health(self):
         """It should return the health status of the service."""

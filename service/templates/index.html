@@ -362,7 +362,7 @@
         <a class="nav-item active" href="/">
           <span class="icon">&#9638;</span> Customers
         </a>
-        <a class="nav-item" href="#" title="Coming soon">
+        <a class="nav-item" href="#" id="nav-add-customer" title="Add a new customer">
           <span class="icon">&#43;</span> Add customer
         </a>
         <p class="nav-label">Management</p>
@@ -381,9 +381,7 @@
           <p class="subtitle">
             A clear view of your customer records, all in one place.
           </p>
-          <button class="btn primary" id="new-customer" disabled>
-            &#43; New customer
-          </button>
+          <button class="btn primary" id="new-customer">&#43; New customer</button>
         </header>
 
         <section class="stats">
@@ -416,6 +414,9 @@
             <p class="editing-banner" id="editing-banner" hidden>
               Editing a customer — make changes and Save, or Cancel.
             </p>
+            <p class="muted" id="form-hint" hidden>
+              Fill in the new customer's details and press Save.
+            </p>
             <form id="customer-form" novalidate>
               <label class="field">
                 First name *
@@ -437,15 +438,15 @@
               <label class="field">
                 Account status
                 <select id="field-active">
-                  <option value="true">Active</option>
+                  <option value="true" selected>Active</option>
                   <option value="false">Inactive</option>
                 </select>
               </label>
               <div class="form-actions">
-                <button class="btn primary" type="submit" id="save-customer" disabled>
+                <button class="btn primary" type="submit" id="save-customer">
                   Save customer
                 </button>
-                <button class="btn" type="button" id="cancel-customer" disabled>
+                <button class="btn" type="button" id="cancel-customer" hidden>
                   Cancel
                 </button>
               </div>
@@ -651,12 +652,23 @@
       function resetForm() {
         document.getElementById("customer-form").reset();
         editingId = null;
-        document.getElementById("save-customer").disabled = true;
-        document.getElementById("cancel-customer").disabled = true;
+        document.getElementById("cancel-customer").hidden = true;
         document.getElementById("editing-banner").hidden = true;
+        document.getElementById("form-hint").hidden = true;
         document
           .querySelectorAll("#customers tbody tr.editing")
           .forEach((row) => row.classList.remove("editing"));
+      }
+
+      function startCreate() {
+        resetForm();
+        document.getElementById("form-hint").hidden = false;
+        document.getElementById("cancel-customer").hidden = false;
+        clearFormStatus();
+        document
+          .getElementById("customer-form")
+          .scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("field-first-name").focus();
       }
 
       function startEdit(customer) {
@@ -666,9 +678,9 @@
         document.getElementById("field-email").value = customer.email;
         document.getElementById("field-address").value = customer.address || "";
         document.getElementById("field-active").value = String(customer.active);
-        document.getElementById("save-customer").disabled = false;
-        document.getElementById("cancel-customer").disabled = false;
         document.getElementById("editing-banner").hidden = false;
+        document.getElementById("form-hint").hidden = true;
+        document.getElementById("cancel-customer").hidden = false;
         clearFormStatus();
         document
           .querySelectorAll("#customers tbody tr.editing")
@@ -687,9 +699,7 @@
 
       async function saveCustomer(event) {
         event.preventDefault();
-        if (editingId === null) {
-          return;
-        }
+        const isEditing = editingId !== null;
 
         const payload = {
           first_name: document.getElementById("field-first-name").value.trim(),
@@ -709,25 +719,38 @@
         }
 
         try {
-          const response = await fetch(`/customers/${editingId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+          const response = await fetch(
+            isEditing ? `/customers/${editingId}` : "/customers",
+            {
+              method: isEditing ? "PUT" : "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            }
+          );
           if (!response.ok) {
             throw new Error("Request failed with status " + response.status);
           }
           resetForm();
-          setFormStatus("Customer updated.", "success");
+          setFormStatus(
+            isEditing ? "Customer updated." : "Customer created.",
+            "success"
+          );
           await loadCustomers();
         } catch (err) {
           setFormStatus(
-            "Unable to update the customer. Please try again.",
+            isEditing
+              ? "Unable to update the customer. Please try again."
+              : "Unable to create the customer. Please try again.",
             "error"
           );
         }
       }
 
+      document.getElementById("nav-add-customer").addEventListener("click", (e) => {
+        e.preventDefault();
+        startCreate();
+      });
+      document.getElementById("new-customer").addEventListener("click", startCreate);
       document
         .getElementById("customer-form")
         .addEventListener("submit", saveCustomer);

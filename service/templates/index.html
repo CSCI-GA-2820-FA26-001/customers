@@ -215,10 +215,19 @@
         font-weight: 400;
         font-size: 0.75rem;
       }
-      .placeholder-note {
-        color: var(--slate-400);
-        font-size: 0.72rem;
-        margin: 0.25rem 0 0.75rem;
+      .form-status {
+        font-size: 0.85rem;
+        margin: 0.75rem 0 0;
+      }
+      .form-status.success {
+        color: var(--green-800);
+      }
+      .form-status.error {
+        color: #b71c1c;
+      }
+      .form-actions {
+        display: flex;
+        gap: 0.5rem;
       }
 
       /* ---------- directory ---------- */
@@ -342,7 +351,7 @@
         <a class="nav-item active" href="/">
           <span class="icon">&#9638;</span> Customers
         </a>
-        <a class="nav-item" href="#" title="Coming soon">
+        <a class="nav-item" href="#" id="nav-add-customer" title="Add a new customer">
           <span class="icon">&#43;</span> Add customer
         </a>
         <p class="nav-label">Management</p>
@@ -361,9 +370,7 @@
           <p class="subtitle">
             A clear view of your customer records, all in one place.
           </p>
-          <button class="btn primary" id="new-customer" disabled>
-            &#43; New customer
-          </button>
+          <button class="btn primary" id="new-customer">&#43; New customer</button>
         </header>
 
         <section class="stats">
@@ -393,37 +400,43 @@
             <p class="muted">
               Create a customer or select an existing customer to edit.
             </p>
-            <p class="placeholder-note">
-              Form wiring arrives with the Create (#29) and Update (#28) stories.
+            <p class="muted" id="form-hint" hidden>
+              Fill in the new customer's details and press Save.
             </p>
-            <form onsubmit="return false;">
+            <form id="customer-form" novalidate>
               <label class="field">
                 First name *
-                <input type="text" placeholder="e.g. Jordan" disabled />
+                <input type="text" id="field-first-name" placeholder="e.g. Jordan" />
               </label>
               <label class="field">
                 Last name *
-                <input type="text" placeholder="e.g. Morgan" disabled />
+                <input type="text" id="field-last-name" placeholder="e.g. Morgan" />
               </label>
               <label class="field">
                 Email address *
-                <input type="email" placeholder="jordan@example.com" disabled />
+                <input type="email" id="field-email" placeholder="jordan@example.com" />
               </label>
               <label class="field">
                 Address
-                <input type="text" placeholder="Street address" disabled />
+                <input type="text" id="field-address" placeholder="Street address" />
                 <span class="help">Optional customer address.</span>
               </label>
               <label class="field">
                 Account status
-                <select disabled>
-                  <option>Active</option>
-                  <option>Inactive</option>
+                <select id="field-active">
+                  <option value="true" selected>Active</option>
+                  <option value="false">Inactive</option>
                 </select>
               </label>
-              <button class="btn primary" type="submit" disabled>
-                Save customer
-              </button>
+              <div class="form-actions">
+                <button class="btn primary" type="submit" id="save-customer">
+                  Save customer
+                </button>
+                <button class="btn" type="button" id="cancel-customer" hidden>
+                  Cancel
+                </button>
+              </div>
+              <p class="form-status" id="form-status" hidden></p>
             </form>
           </section>
 
@@ -605,6 +618,88 @@
           error.hidden = false;
         }
       }
+
+      function setFormStatus(message, kind) {
+        const status = document.getElementById("form-status");
+        status.textContent = message;
+        status.className = "form-status " + kind;
+        status.hidden = false;
+      }
+
+      function clearFormStatus() {
+        const status = document.getElementById("form-status");
+        status.textContent = "";
+        status.hidden = true;
+      }
+
+      function resetForm() {
+        document.getElementById("customer-form").reset();
+        document.getElementById("cancel-customer").hidden = true;
+        document.getElementById("form-hint").hidden = true;
+      }
+
+      function startCreate() {
+        resetForm();
+        document.getElementById("form-hint").hidden = false;
+        document.getElementById("cancel-customer").hidden = false;
+        clearFormStatus();
+        document
+          .getElementById("customer-form")
+          .scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("field-first-name").focus();
+      }
+
+      async function saveCustomer(event) {
+        event.preventDefault();
+        const payload = {
+          first_name: document.getElementById("field-first-name").value.trim(),
+          last_name: document.getElementById("field-last-name").value.trim(),
+          email: document.getElementById("field-email").value.trim(),
+          address:
+            document.getElementById("field-address").value.trim() || null,
+          active: document.getElementById("field-active").value === "true",
+        };
+
+        if (!payload.first_name || !payload.last_name || !payload.email) {
+          setFormStatus(
+            "First name, last name, and email are required.",
+            "error"
+          );
+          return;
+        }
+
+        try {
+          const response = await fetch("/customers", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            throw new Error("Request failed with status " + response.status);
+          }
+          resetForm();
+          setFormStatus("Customer created.", "success");
+          await loadCustomers();
+        } catch (err) {
+          setFormStatus(
+            "Unable to create the customer. Please try again.",
+            "error"
+          );
+        }
+      }
+
+      document.getElementById("nav-add-customer").addEventListener("click", (e) => {
+        e.preventDefault();
+        startCreate();
+      });
+      document.getElementById("new-customer").addEventListener("click", startCreate);
+      document
+        .getElementById("customer-form")
+        .addEventListener("submit", saveCustomer);
+      document.getElementById("cancel-customer").addEventListener("click", () => {
+        resetForm();
+        clearFormStatus();
+      });
 
       document.getElementById("refresh").addEventListener("click", loadCustomers);
       document.getElementById("apply-filters").addEventListener("click", refreshTable);

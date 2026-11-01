@@ -115,6 +115,22 @@ def _create_customer(context, customer):
     _wait_for_row(context, customer["first_name"])
 
 
+def _wait_for_list_settled(context):
+    """Wait until the customer table has finished rendering."""
+
+    def _settled(driver):
+        rows = driver.find_elements(By.CSS_SELECTOR, "#customers tbody tr")
+        if rows:
+            return True
+        empty = driver.find_element(By.ID, "empty")
+        if empty.get_attribute("hidden") is None:
+            return True
+        error = driver.find_element(By.ID, "error")
+        return error.get_attribute("hidden") is None
+
+    return WebDriverWait(context.driver, TIMEOUT).until(_settled)
+
+
 @given("multiple customers exist in the system")
 def step_multiple_customers_exist(context):
     """Create several customers through the web UI."""
@@ -125,10 +141,14 @@ def step_multiple_customers_exist(context):
         context.customers.append(customer)
 
 
-@given("no customers match the current filter")
-def step_no_customers_match(context):
-    """Choose a filter value that no customer can match."""
-    context.filter_value = _unique("Nomatch")
+@given("no customers exist in the system")
+def step_no_customers_exist(context):
+    """No test data is created; the environment must start empty.
+
+    This scenario relies on the BDD suite running against an isolated
+    database. The tests never talk to the service API or the database
+    directly, so they cannot clear records themselves.
+    """
 
 
 @given("the Customers API is unavailable")
@@ -151,14 +171,6 @@ def step_attempt_view_list(context):
     _open_page(context)
 
 
-@when("an admin filters the customers by that value")
-def step_filter_customers(context):
-    """Apply a first-name filter that matches no customer."""
-    _open_page(context)
-    _type(context, "filter-first-name", context.filter_value)
-    context.driver.find_element(By.ID, "apply-filters").click()
-
-
 @then("all existing customers are displayed in the UI")
 def step_all_customers_displayed(context):
     """Verify each created customer appears in the table."""
@@ -179,9 +191,13 @@ def step_customer_information_correct(context):
 
 @then("the UI displays an empty customer list")
 def step_empty_customer_list(context):
-    """Verify no rows are rendered for the filter."""
+    """Verify no rows are rendered once the table has finished loading."""
+    _wait_for_list_settled(context)
     rows = context.driver.find_elements(By.CSS_SELECTOR, "#customers tbody tr")
-    assert len(rows) == 0, f"expected no rows, found {len(rows)}"
+    assert len(rows) == 0, (
+        f"expected an empty customer list, found {len(rows)} rows; "
+        "run the BDD suite against an isolated database"
+    )
 
 
 @then("indicates that no customers are available")
@@ -195,8 +211,16 @@ def step_empty_message(context):
 
 @then("the UI displays an appropriate error message")
 def step_error_message(context):
-    """Verify the error state message is visible."""
+    """Verify an error is shown and no customers are rendered as success."""
     error = WebDriverWait(context.driver, TIMEOUT).until(
         EC.visibility_of_element_located((By.ID, "error"))
     )
     assert error.text.strip(), "expected a non-empty error message"
+    rows = context.driver.find_elements(By.CSS_SELECTOR, "#customers tbody tr")
+    assert len(rows) == 0, (
+        f"expected no customers when the API is unavailable, found {len(rows)}"
+    )
+    empty = context.driver.find_element(By.ID, "empty")
+    assert empty.get_attribute("hidden") is not None, (
+        "the UI must not show an empty-list state when the request failed"
+    )

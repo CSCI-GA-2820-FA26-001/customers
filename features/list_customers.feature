@@ -10,8 +10,8 @@ Feature: List Customers UI
     And their information is shown correctly
 
   Scenario: Display an empty customer list
-    Given no customers exist in the system
-    When an admin opens the Customers page
+    Given no customers match the current filter
+    When an admin filters the customers by that value
     Then the UI displays an empty customer list
     And indicates that no customers are available
 

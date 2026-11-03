@@ -88,6 +88,15 @@ class TestCustomerService(TestCase):
         self.assertIn('id="customer-view"', body)
         self.assertIn("/api/customers/", body)
 
+    def test_index_delete_control(self):
+        """It should serve the delete control and its status message."""
+        response = self.client.get("/")
+
+        body = response.get_data(as_text=True)
+        self.assertIn('id="list-status"', body)
+        self.assertIn("delete-btn", body)
+        self.assertIn('method: "DELETE"', body)
+
     def test_health(self):
         """It should return the health status of the service."""
         response = self.client.get("/health")

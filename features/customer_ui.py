@@ -88,3 +88,14 @@ def block_requests(context, url_pattern):
     """Make the browser fail every request that matches the URL pattern."""
     context.driver.execute_cdp_cmd("Network.enable", {})
     context.driver.execute_cdp_cmd("Network.setBlockedURLs", {"urls": [url_pattern]})
+
+
+def customer_listed(context, customer):
+    """Return True when the customer's row is in the list once it has loaded."""
+    WebDriverWait(context.driver, TIMEOUT).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "#customers[data-state='ready']"))
+    )
+    rows = context.driver.find_elements(
+        By.CSS_SELECTOR, f"#customers tbody tr[data-customer-id='{customer['id']}']"
+    )
+    return bool(rows)

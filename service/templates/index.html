@@ -600,7 +600,7 @@
         const error = document.getElementById("error");
         const tbody = document.querySelector("#customers tbody");
         try {
-          const response = await fetch("/customers");
+          const response = await fetch("/api/customers");
           if (!response.ok) {
             throw new Error("Request failed with status " + response.status);
           }
@@ -669,7 +669,7 @@
         }
 
         try {
-          const response = await fetch("/customers", {
+          const response = await fetch("/api/customers", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),

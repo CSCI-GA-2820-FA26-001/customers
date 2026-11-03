@@ -106,6 +106,15 @@ class TestCustomerService(TestCase):
         self.assertIn("/api/customers?", body)
         self.assertIn("No matching customers were found", body)
 
+    def test_index_customer_action(self):
+        """It should serve the activate and deactivate action control."""
+        response = self.client.get("/")
+
+        body = response.get_data(as_text=True)
+        self.assertIn("action-btn", body)
+        self.assertIn("/api/customers/${customer.id}/${action}", body)
+        self.assertIn('method: "PUT"', body)
+
     def test_health(self):
         """It should return the health status of the service."""
         response = self.client.get("/health")

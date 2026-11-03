@@ -623,9 +623,11 @@
           edit.textContent = "Edit";
           edit.disabled = true;
           const toggle = document.createElement("button");
-          toggle.className = "btn";
+          toggle.className = "btn action-btn";
           toggle.textContent = customer.active ? "Deactivate" : "Activate";
-          toggle.disabled = true;
+          toggle.addEventListener("click", () =>
+            setCustomerActive(customer, !customer.active)
+          );
           actions.append(view, edit, remove, toggle);
           actionsCell.appendChild(actions);
 
@@ -783,6 +785,27 @@
         status.textContent = message;
         status.className = "form-status " + kind;
         status.hidden = false;
+      }
+
+      async function setCustomerActive(customer, active) {
+        const action = active ? "activate" : "deactivate";
+        try {
+          const response = await fetch(
+            `/api/customers/${customer.id}/${action}`,
+            { method: "PUT" }
+          );
+          if (!response.ok) {
+            throw new Error("Request failed with status " + response.status);
+          }
+          await loadCustomers();
+          routeCustomerView();
+          setListStatus(`Customer ${action}d.`, "success");
+        } catch (err) {
+          setListStatus(
+            `Unable to ${action} the customer. Please try again.`,
+            "error"
+          );
+        }
       }
 
       async function deleteCustomer(customer) {

@@ -144,7 +144,10 @@ The list endpoint accepts one of the query parameters `first_name`,
 Reading or updating a customer that does not exist returns 404 Not Found.
 Deleting a customer that does not exist also returns 204 No Content.
 
-Every error is returned as JSON with `status`, `error`, and `message` fields.
+Every error is returned as JSON, never as HTML. Errors have `status`, `error`,
+and `message` fields. The one exception is reading a customer that does not
+exist, which returns `{"error": "Customer not found"}`. An invalid query value
+also includes an `errors` field that names the parameter.
 Invalid customer data, an invalid query value, or an invalid id returns
 400 Bad Request. POST or PUT requests with an unsupported content type return
 415 Unsupported Media Type.

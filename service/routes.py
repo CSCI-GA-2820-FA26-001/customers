@@ -182,7 +182,7 @@ class CustomerResource(Resource):
         """Update a Customer"""
         app.logger.info("Request to update customer with id: %s", customer_id)
 
-        data = request.get_json()
+        data = get_json_body()
 
         customer = Customer.find(customer_id)
         if not customer:
@@ -263,7 +263,7 @@ class CustomerCollection(Resource):
         app.logger.info("Request to create a customer")
 
         customer = Customer()
-        customer.deserialize(request.get_json())
+        customer.deserialize(get_json_body())
         customer.create()
 
         location_url = api.url_for(
@@ -313,6 +313,14 @@ class DeactivateResource(Resource):
 ######################################################################
 #  U T I L I T Y   F U N C T I O N S
 ######################################################################
+def get_json_body():
+    """Returns the JSON request body, rejecting bodies nested too deeply to parse"""
+    try:
+        return request.get_json()
+    except RecursionError:
+        abort(status.HTTP_400_BAD_REQUEST, "Request body is nested too deeply")
+
+
 def set_active(customer_id, active):
     """Sets the active flag of an existing customer"""
     customer = Customer.find(customer_id)

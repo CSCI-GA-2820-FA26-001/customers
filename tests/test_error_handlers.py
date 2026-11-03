@@ -20,6 +20,7 @@ Error handling and Swagger documentation tests for the Customers API
 
 # pylint: disable=duplicate-code
 import os
+import json
 import logging
 from unittest import TestCase
 from unittest.mock import patch
@@ -38,6 +39,7 @@ HUGE_ID = 99999999999999999999
 ######################################################################
 #  T E S T   C A S E S
 ######################################################################
+# pylint: disable=too-many-public-methods
 class TestErrorHandlers(TestCase):
     """Every error must be reported as JSON and never as a server error"""
 
@@ -191,6 +193,63 @@ class TestErrorHandlers(TestCase):
             "Internal Server Error",
         )
         self.assertNotIn("secret", data["message"])
+
+    ######################################################################
+    #  R E G R E S S I O N   T E S T S
+    ######################################################################
+
+    def test_deeply_nested_json(self):
+        """It should return a JSON 400 for a body nested too deeply to parse"""
+        customer = Customer(first_name="Ada", last_name="Lovelace", email="a@b.c")
+        customer.create()
+        body = "[" * 100000
+        for method, url in (
+            ("post", BASE_URL),
+            ("put", f"{BASE_URL}/{customer.id}"),
+        ):
+            response = getattr(self.client, method)(
+                url, data=body, content_type="application/json"
+            )
+            data = self.assert_error(response, status.HTTP_400_BAD_REQUEST, "Bad Request")
+            self.assertIn("nested", data["message"])
+
+    def test_database_errors_hide_details(self):
+        """It should not expose SQL or driver details when the database rejects data"""
+        customer = Customer(first_name="Ada", last_name="Lovelace", email="a@b.c")
+        customer.create()
+        rejected = (
+            "a\u0000b",  # a NUL character cannot be stored in a text column
+            "x" * 100,  # longer than the first_name column
+        )
+        for first_name in rejected:
+            payload = json.dumps(
+                {"first_name": first_name, "last_name": "L", "email": "a@b.c"}
+            )
+            for method, url in (
+                ("post", BASE_URL),
+                ("put", f"{BASE_URL}/{customer.id}"),
+            ):
+                response = getattr(self.client, method)(
+                    url, data=payload, content_type="application/json"
+                )
+                data = self.assert_error(
+                    response, status.HTTP_400_BAD_REQUEST, "Bad Request"
+                )
+                for detail in ("SQL", "psycopg", "INSERT", "UPDATE", "VARCHAR"):
+                    self.assertNotIn(detail, data["message"])
+        stored = Customer.find(customer.id)
+        self.assertEqual(stored.first_name, "Ada")
+
+    def test_database_error_on_delete_hides_details(self):
+        """It should report a failed delete without database details"""
+        customer = Customer(first_name="Ada", last_name="Lovelace", email="a@b.c")
+        customer.create()
+        with patch.object(
+            db.session, "commit", side_effect=RuntimeError("SQL: DELETE FROM customer")
+        ):
+            response = self.client.delete(f"{BASE_URL}/{customer.id}")
+        data = self.assert_error(response, status.HTTP_400_BAD_REQUEST, "Bad Request")
+        self.assertNotIn("DELETE", data["message"])
 
 
 class TestSwaggerDocumentation(TestCase):

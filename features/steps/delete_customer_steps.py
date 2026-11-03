@@ -95,7 +95,7 @@ def step_remains_listed(context):
     assert customer_listed(context, context.customer)
 
 
-@then("the UI displays an appropriate error message")
+@then("the UI reports that the customer could not be deleted")
 def step_error_message(context):
     """Verify the failure message is shown."""
     assert "unable to delete" in _list_status(context)

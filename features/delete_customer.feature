@@ -25,6 +25,6 @@ Feature: Delete Customer UI
     And I am viewing the customer list
     And deleting a customer will fail
     When I attempt to delete the customer
-    Then the UI displays an appropriate error message
+    Then the UI reports that the customer could not be deleted
     And does not indicate that the customer was deleted
     And the customer remains in the list

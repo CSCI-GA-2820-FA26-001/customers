@@ -19,9 +19,22 @@ Customer Service
 
 This service implements a REST API that allows you to Create, Read, Update
 and Delete Customer.
+
+Paths:
+------
+GET /health - Returns the health status of the service
+GET /apidocs/ - Swagger documentation for the REST API
+GET /api/customers - Returns a list of Customers, optionally filtered
+POST /api/customers - Creates a new Customer
+GET /api/customers/{id} - Returns the Customer with the given id
+PUT /api/customers/{id} - Updates the Customer with the given id
+DELETE /api/customers/{id} - Deletes the Customer with the given id
+PUT /api/customers/{id}/activate - Activates the Customer
+PUT /api/customers/{id}/deactivate - Deactivates the Customer
 """
 
 from flask import abort, current_app as app, jsonify, request
+from flask_restx import Api, Resource, fields, inputs, reqparse
 
 from service.common import status
 from service.models import Customer
@@ -46,73 +59,270 @@ def health():
 
 
 ######################################################################
-#  R E S T   A P I   E N D P O I N T S
+# Configure Swagger before initializing it
 ######################################################################
-@app.route("/customers", methods=["POST"])
-def create_customer():
-    """Creates a customer and returns the newly created resource."""
-    app.logger.info("Request to create a customer")
+api = Api(
+    app,
+    version="1.0.0",
+    title="Customers REST API Service",
+    description="REST API for managing customers.",
+    default="customers",
+    default_label="Customer operations",
+    doc="/apidocs/",
+    prefix="/api",
+)
 
-    customer = Customer()
-    customer.deserialize(request.get_json())
-    customer.create()
+# Define the models so that the docs reflect what can be sent
+create_model = api.model(
+    "Customer",
+    {
+        "first_name": fields.String(
+            required=True, description="The first name of the customer"
+        ),
+        "last_name": fields.String(
+            required=True, description="The last name of the customer"
+        ),
+        "email": fields.String(
+            required=True, description="The email address of the customer"
+        ),
+        "address": fields.String(
+            required=False, description="The postal address of the customer"
+        ),
+        "active": fields.Boolean(
+            required=False,
+            default=True,
+            description="Is the customer active?",
+        ),
+    },
+)
 
-    message = customer.serialize()
-    location_url = f"{request.host_url.rstrip('/')}/customers/{customer.id}"
+customer_model = api.inherit(
+    "CustomerModel",
+    create_model,
+    {
+        "id": fields.Integer(
+            readOnly=True,
+            description="The unique id assigned internally by the service",
+        ),
+    },
+)
 
-    return (
-        jsonify(message),
-        status.HTTP_201_CREATED,
-        {"Location": location_url},
-    )
+# Query string arguments accepted by the list endpoint
+customer_args = reqparse.RequestParser()
+customer_args.add_argument(
+    "first_name",
+    type=str,
+    location="args",
+    required=False,
+    help="List customers by first name",
+)
+customer_args.add_argument(
+    "last_name",
+    type=str,
+    location="args",
+    required=False,
+    help="List customers by last name",
+)
+customer_args.add_argument(
+    "email",
+    type=str,
+    location="args",
+    required=False,
+    help="List customers by email address",
+)
+customer_args.add_argument(
+    "active",
+    type=inputs.boolean,
+    location="args",
+    required=False,
+    help="List customers by active status",
+)
 
 
 ######################################################################
-# LIST ALL CUSTOMERS
+#  PATH: /customers/{id}
 ######################################################################
-@app.route("/customers", methods=["GET"])
-def list_customers():
-    """Returns a list of all Customers"""
-    app.logger.info("Request to list all Customers")
-    first_name = request.args.get("first_name")
-    last_name = request.args.get("last_name")
-    email = request.args.get("email")
-    active = request.args.get("active")
+@api.route("/customers/<int:customer_id>")
+@api.param("customer_id", "The customer identifier")
+class CustomerResource(Resource):
+    """
+    CustomerResource class
 
-    if first_name is not None:
-        customers = Customer.find_by_first_name(first_name)
-    elif last_name is not None:
-        customers = Customer.find_by_last_name(last_name)
-    elif email is not None:
-        customers = Customer.find_by_email(email)
-    elif active is not None:
-        customers = Customer.find_by_active(active.lower() == "true")
-    else:
-        customers = Customer.all()
+    Allows the manipulation of a single Customer
+    GET /customers/{id} - Returns a Customer with the id
+    PUT /customers/{id} - Updates a Customer with the id
+    DELETE /customers/{id} - Deletes a Customer with the id
+    """
 
-    results = [customer.serialize() for customer in customers]
-    app.logger.info("Returning %d customers", len(results))
-    return jsonify(results), status.HTTP_200_OK
+    # ------------------------------------------------------------------
+    # RETRIEVE A CUSTOMER
+    # ------------------------------------------------------------------
+    @api.doc("read_customer")
+    @api.response(200, "Success", customer_model)
+    @api.response(404, "Customer not found")
+    def get(self, customer_id):
+        """Retrieve a single Customer"""
+        app.logger.info("Request to read customer with ID %s", customer_id)
+        customer = Customer.find(customer_id)
+        if customer is None:
+            return {"error": "Customer not found"}, status.HTTP_404_NOT_FOUND
+
+        return customer.serialize(), status.HTTP_200_OK
+
+    # ------------------------------------------------------------------
+    # UPDATE AN EXISTING CUSTOMER
+    # ------------------------------------------------------------------
+    @api.doc("update_customer")
+    @api.response(404, "Customer not found")
+    @api.response(400, "The posted Customer data was not valid")
+    @api.response(415, "The request content type must be application/json")
+    @api.expect(create_model)
+    @api.marshal_with(customer_model)
+    def put(self, customer_id):
+        """Update a Customer"""
+        app.logger.info("Request to update customer with id: %s", customer_id)
+
+        data = get_json_body()
+
+        customer = Customer.find(customer_id)
+        if not customer:
+            abort(
+                status.HTTP_404_NOT_FOUND,
+                f"Customer with id '{customer_id}' was not found.",
+            )
+
+        customer.deserialize(data)
+        customer.update()
+
+        app.logger.info("Customer with id [%s] updated.", customer.id)
+        return customer.serialize(), status.HTTP_200_OK
+
+    # ------------------------------------------------------------------
+    # DELETE A CUSTOMER
+    # ------------------------------------------------------------------
+    @api.doc("delete_customer")
+    @api.response(204, "Customer deleted")
+    def delete(self, customer_id):
+        """Delete a Customer
+
+        Deleting a customer that does not exist is not an error.
+        """
+        app.logger.info("Request to delete customer with id: %s", customer_id)
+
+        customer = Customer.find(customer_id)
+        if customer is not None:
+            customer.delete()
+            app.logger.info("Customer with id [%s] deleted.", customer_id)
+
+        return "", status.HTTP_204_NO_CONTENT
 
 
-@app.route("/customers/<int:customer_id>", methods=["GET"])
-def read_customer(customer_id):
-    """Retrieve a customer by ID"""
-    app.logger.info("Request to read customer with ID %s", customer_id)
-    customer = Customer.find(customer_id)
-    if customer is None:
-        return jsonify({"error": "Customer not found"}), status.HTTP_404_NOT_FOUND
+######################################################################
+#  PATH: /customers
+######################################################################
+@api.route("/customers")
+class CustomerCollection(Resource):
+    """Handles all interactions with collections of Customers"""
 
-    return jsonify(customer.serialize()), status.HTTP_200_OK
+    # ------------------------------------------------------------------
+    # LIST ALL CUSTOMERS
+    # ------------------------------------------------------------------
+    @api.doc("list_customers")
+    @api.expect(customer_args)
+    @api.marshal_list_with(customer_model)
+    def get(self):
+        """Returns all of the Customers, optionally filtered by one attribute"""
+        app.logger.info("Request to list all Customers")
+        args = customer_args.parse_args()
+
+        if args["first_name"] is not None:
+            customers = Customer.find_by_first_name(args["first_name"])
+        elif args["last_name"] is not None:
+            customers = Customer.find_by_last_name(args["last_name"])
+        elif args["email"] is not None:
+            customers = Customer.find_by_email(args["email"])
+        elif args["active"] is not None:
+            customers = Customer.find_by_active(args["active"])
+        else:
+            customers = Customer.all()
+
+        results = [customer.serialize() for customer in customers]
+        app.logger.info("Returning %d customers", len(results))
+        return results, status.HTTP_200_OK
+
+    # ------------------------------------------------------------------
+    # CREATE A NEW CUSTOMER
+    # ------------------------------------------------------------------
+    @api.doc("create_customer")
+    @api.response(400, "The posted data was not valid")
+    @api.response(415, "The request content type must be application/json")
+    @api.expect(create_model)
+    @api.marshal_with(customer_model, code=status.HTTP_201_CREATED)
+    def post(self):
+        """Creates a Customer"""
+        app.logger.info("Request to create a customer")
+
+        customer = Customer()
+        customer.deserialize(get_json_body())
+        customer.create()
+
+        location_url = api.url_for(
+            CustomerResource, customer_id=customer.id, _external=True
+        )
+        return (
+            customer.serialize(),
+            status.HTTP_201_CREATED,
+            {"Location": location_url},
+        )
 
 
-@app.route("/customers/<int:customer_id>", methods=["PUT"])
-def update_customer(customer_id):
-    """Updates an existing customer and returns the updated resource."""
-    app.logger.info("Request to update customer with id: %s", customer_id)
+######################################################################
+#  PATH: /customers/{id}/activate
+######################################################################
+@api.route("/customers/<int:customer_id>/activate")
+@api.param("customer_id", "The customer identifier")
+class ActivateResource(Resource):
+    """Activate action on a Customer"""
 
-    data = request.get_json()
+    @api.doc("activate_customer")
+    @api.response(404, "Customer not found")
+    @api.marshal_with(customer_model)
+    def put(self, customer_id):
+        """Activates a Customer (sets active to True)"""
+        app.logger.info("Request to activate customer with id: %s", customer_id)
+        return set_active(customer_id, True)
 
+
+######################################################################
+#  PATH: /customers/{id}/deactivate
+######################################################################
+@api.route("/customers/<int:customer_id>/deactivate")
+@api.param("customer_id", "The customer identifier")
+class DeactivateResource(Resource):
+    """Deactivate action on a Customer"""
+
+    @api.doc("deactivate_customer")
+    @api.response(404, "Customer not found")
+    @api.marshal_with(customer_model)
+    def put(self, customer_id):
+        """Deactivates a Customer (sets active to False)"""
+        app.logger.info("Request to deactivate customer with id: %s", customer_id)
+        return set_active(customer_id, False)
+
+
+######################################################################
+#  U T I L I T Y   F U N C T I O N S
+######################################################################
+def get_json_body():
+    """Returns the JSON request body, rejecting bodies nested too deeply to parse"""
+    try:
+        return request.get_json()
+    except RecursionError:
+        abort(status.HTTP_400_BAD_REQUEST, "Request body is nested too deeply")
+
+
+def set_active(customer_id, active):
+    """Sets the active flag of an existing customer"""
     customer = Customer.find(customer_id)
     if not customer:
         abort(
@@ -120,68 +330,8 @@ def update_customer(customer_id):
             f"Customer with id '{customer_id}' was not found.",
         )
 
-    customer.deserialize(data)
+    customer.active = active
     customer.update()
 
-    app.logger.info("Customer with id [%s] updated.", customer.id)
-    return jsonify(customer.serialize()), status.HTTP_200_OK
-
-
-######################################################################
-# DELETE A CUSTOMER
-######################################################################
-@app.route("/customers/<int:customer_id>", methods=["DELETE"])
-def delete_customer(customer_id):
-    """Deletes a customer by ID."""
-    app.logger.info("Request to delete customer with id: %s", customer_id)
-
-    customer = Customer.find(customer_id)
-    if customer is not None:
-        customer.delete()
-        app.logger.info("Customer with id [%s] deleted.", customer_id)
-
-    return "", status.HTTP_204_NO_CONTENT
-
-
-######################################################################
-# ACTION: ACTIVATE A CUSTOMER
-######################################################################
-@app.route("/customers/<int:customer_id>/activate", methods=["PUT"])
-def activate_customer(customer_id):
-    """Activates a customer (sets active to True)."""
-    app.logger.info("Request to activate customer with id: %s", customer_id)
-
-    customer = Customer.find(customer_id)
-    if not customer:
-        abort(
-            status.HTTP_404_NOT_FOUND,
-            f"Customer with id '{customer_id}' was not found.",
-        )
-
-    customer.active = True
-    customer.update()
-
-    app.logger.info("Customer with id [%s] activated.", customer_id)
-    return jsonify(customer.serialize()), status.HTTP_200_OK
-
-
-######################################################################
-# ACTION: DEACTIVATE A CUSTOMER
-######################################################################
-@app.route("/customers/<int:customer_id>/deactivate", methods=["PUT"])
-def deactivate_customer(customer_id):
-    """Deactivates a customer (sets active to False)."""
-    app.logger.info("Request to deactivate customer with id: %s", customer_id)
-
-    customer = Customer.find(customer_id)
-    if not customer:
-        abort(
-            status.HTTP_404_NOT_FOUND,
-            f"Customer with id '{customer_id}' was not found.",
-        )
-
-    customer.active = False
-    customer.update()
-
-    app.logger.info("Customer with id [%s] deactivated.", customer_id)
-    return jsonify(customer.serialize()), status.HTTP_200_OK
+    app.logger.info("Customer with id [%s] active set to %s.", customer_id, active)
+    return customer.serialize(), status.HTTP_200_OK

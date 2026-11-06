@@ -120,20 +120,36 @@ For PUT requests, omitted optional fields are reset to their defaults:
 
 ## API Endpoints
 
+The REST API is served under the `/api` prefix. Interactive Swagger
+documentation, including the request and response data models, is available at
+`http://localhost:8080/apidocs/` and the OpenAPI document at
+`http://localhost:8080/api/swagger.json`.
+
 | Method | Endpoint | Description | Success status |
 | --- | --- | --- | --- |
 | GET | `/` | Get service information | 200 OK |
-| POST | `/customers` | Create a customer | 201 Created |
-| GET | `/customers` | List all customers | 200 OK |
-| GET | `/customers/<id>` | Read a customer | 200 OK |
-| PUT | `/customers/<id>` | Update a customer | 200 OK |
-| DELETE | `/customers/<id>` | Delete a customer | 204 No Content |
+| GET | `/health` | Check the health of the service | 200 OK |
+| POST | `/api/customers` | Create a customer | 201 Created |
+| GET | `/api/customers` | List customers, optionally filtered | 200 OK |
+| GET | `/api/customers/<id>` | Read a customer | 200 OK |
+| PUT | `/api/customers/<id>` | Update a customer | 200 OK |
+| DELETE | `/api/customers/<id>` | Delete a customer | 204 No Content |
+| PUT | `/api/customers/<id>/activate` | Activate a customer | 200 OK |
+| PUT | `/api/customers/<id>/deactivate` | Deactivate a customer | 200 OK |
 
-Reading, updating, or deleting a customer that does not exist returns
-404 Not Found.
+The list endpoint accepts one of the query parameters `first_name`,
+`last_name`, `email`, or `active` (`true` or `false`), for example
+`/api/customers?last_name=Lovelace`.
 
-Invalid customer data returns 400 Bad Request.
-POST or PUT requests with an unsupported content type return
+Reading or updating a customer that does not exist returns 404 Not Found.
+Deleting a customer that does not exist also returns 204 No Content.
+
+Every error is returned as JSON, never as HTML. Errors have `status`, `error`,
+and `message` fields. The one exception is reading a customer that does not
+exist, which returns `{"error": "Customer not found"}`. An invalid query value
+also includes an `errors` field that names the parameter.
+Invalid customer data, an invalid query value, or an invalid id returns
+400 Bad Request. POST or PUT requests with an unsupported content type return
 415 Unsupported Media Type.
 
 ## API Examples
@@ -143,7 +159,7 @@ Keep the service running, and use a second terminal to execute these commands.
 ### Create a customer
 
 ```bash
-curl -i -X POST http://localhost:8080/customers \
+curl -i -X POST http://localhost:8080/api/customers \
   -H "Content-Type: application/json" \
   -d '{
     "first_name": "Ada",
@@ -170,7 +186,7 @@ remains available.
 ### List all customers
 
 ```bash
-curl -i http://localhost:8080/customers
+curl -i http://localhost:8080/api/customers
 ```
 
 Returns a JSON array. If there are no customers, the array is empty: `[]`.
@@ -178,13 +194,13 @@ Returns a JSON array. If there are no customers, the array is empty: `[]`.
 ### Read a customer
 
 ```bash
-curl -i "http://localhost:8080/customers/$CUSTOMER_ID"
+curl -i "http://localhost:8080/api/customers/$CUSTOMER_ID"
 ```
 
 ### Update a customer
 
 ```bash
-curl -i -X PUT "http://localhost:8080/customers/$CUSTOMER_ID" \
+curl -i -X PUT "http://localhost:8080/api/customers/$CUSTOMER_ID" \
   -H "Content-Type: application/json" \
   -d '{
     "first_name": "Ada",
@@ -200,12 +216,12 @@ Returns the updated customer.
 ### Delete a customer
 
 ```bash
-curl -i -X DELETE "http://localhost:8080/customers/$CUSTOMER_ID"
+curl -i -X DELETE "http://localhost:8080/api/customers/$CUSTOMER_ID"
 ```
 
 A successful deletion returns 204 No Content with an empty response body.
 
-Reading or deleting the same customer afterward returns 404 Not Found.
+Reading the same customer afterward returns 404 Not Found.
 
 ## Project Structure
 
@@ -213,7 +229,7 @@ Reading or deleting the same customer afterward returns 404 Not Found.
 | --- | --- |
 | `.devcontainer/` | Development container and PostgreSQL configuration |
 | `service/models.py` | Customer model, validation, and database operations |
-| `service/routes.py` | REST API endpoints |
+| `service/routes.py` | REST API endpoints and Swagger documentation |
 | `service/config.py` | Application configuration |
 | `service/common/` | Shared status codes, logging, error handlers, and CLI commands |
 | `tests/` | Automated tests and test data factories |

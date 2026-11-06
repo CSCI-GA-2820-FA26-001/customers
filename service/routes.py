@@ -33,7 +33,7 @@ PUT /api/customers/{id}/activate - Activates the Customer
 PUT /api/customers/{id}/deactivate - Deactivates the Customer
 """
 
-from flask import abort, current_app as app, jsonify, request
+from flask import abort, current_app as app, jsonify, render_template, request
 from flask_restx import Api, Resource, fields, inputs, reqparse
 
 from service.common import status
@@ -45,8 +45,8 @@ from service.models import Customer
 ######################################################################
 @app.route("/")
 def index():
-    """Returns useful information about the Customers service."""
-    return jsonify({"name": "Customers Service"}), status.HTTP_200_OK
+    """Returns the Customers admin UI."""
+    return render_template("index.html")
 
 
 ######################################################################

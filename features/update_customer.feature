@@ -27,3 +27,9 @@ Feature: Update Customer UI
     When I save the changes and the update fails
     Then the UI communicates that the update was unsuccessful
     And the UI does not indicate that the changes were saved successfully
+
+  Scenario: Reject an invalid email address when updating
+    Given I have opened a customer's edit form
+    When I change the customer's email to an invalid address and save
+    Then the UI communicates that the email address is invalid
+    And the customer's previously saved details remain unchanged

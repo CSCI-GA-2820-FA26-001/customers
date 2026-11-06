@@ -238,6 +238,23 @@ def step_change_and_cancel(context):
     context.driver.find_element(By.ID, "cancel-customer").click()
 
 
+@when("I change the customer's email to an invalid address and save")
+def step_invalid_email_and_save(context):
+    """Attempt to save an update with a malformed email address."""
+    values = dict(UPDATED)
+    values["email"] = "not-an-email"
+    _fill_form(context, values)
+    context.driver.find_element(By.ID, "save-customer").click()
+    _wait_for_status(context, "valid email")
+
+
+@then("the UI communicates that the email address is invalid")
+def step_invalid_email_message(context):
+    """Verify the invalid email message is shown."""
+    status = context.driver.find_element(By.ID, "form-status")
+    assert "valid email" in status.text.lower()
+
+
 @when("I save the changes and the update fails")
 def step_save_fails(context):
     """Block the update request and attempt to save."""

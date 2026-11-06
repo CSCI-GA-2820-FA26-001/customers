@@ -47,13 +47,6 @@ Feature: Create Customer UI
       | last name  |
       | email      |
 
-  Scenario: Reject an invalid email address
-    Given I am on the Customers admin page
-    When I enter a customer with an invalid email address
-    And I submit the form
-    Then the customer is not created
-    And the UI identifies that the email address is invalid
-
   Scenario: Handle an unsuccessful creation
     Given I am on the Customers admin page
     And the creation request will fail

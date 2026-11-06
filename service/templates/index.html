@@ -648,6 +648,8 @@
         const error = document.getElementById("error");
         const tbody = document.querySelector("#customers tbody");
         document.getElementById("customers").dataset.state = "loading";
+        error.hidden = true;
+        document.getElementById("list-status").hidden = true;
         try {
           const results = await fetchCustomers(currentQuery);
           allCustomers = currentQuery ? await fetchCustomers("") : results;
@@ -790,6 +792,7 @@
         if (!window.confirm(`Delete ${name}? This cannot be undone.`)) {
           return;
         }
+        clearFormStatus();
         try {
           const response = await fetch(`/api/customers/${customer.id}`, {
             method: "DELETE",

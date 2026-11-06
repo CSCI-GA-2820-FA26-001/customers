@@ -668,6 +668,15 @@
           return;
         }
 
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(payload.email)) {
+          setFormStatus(
+            "Please enter a valid email address.",
+            "error"
+          );
+          return;
+        }
+
         try {
           const response = await fetch("/api/customers", {
             method: "POST",

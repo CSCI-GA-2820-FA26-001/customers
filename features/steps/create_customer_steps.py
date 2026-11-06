@@ -13,6 +13,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
 
 TIMEOUT = 10
+INVALID_EMAIL = "not-an-email"
 
 
 def _open_page(context):
@@ -116,6 +117,15 @@ def step_enter_valid_and_submit(context):
     _submit(context)
 
 
+@when("I enter a customer with an invalid email address")
+def step_enter_invalid_email(context):
+    """Fill the required fields but use a malformed email."""
+    _fill_required(context)
+    _type(context, "field-email", INVALID_EMAIL)
+    context.email = INVALID_EMAIL
+    context.rows_before_submit = _count_rows(context)
+
+
 REQUIRED_FIELD_IDS = {
     "first name": "field-first-name",
     "last name": "field-last-name",
@@ -181,11 +191,10 @@ def step_created_successfully(context):
 
 @then("the customer is not created")
 def step_not_created(context):
-    """Verify the validation message appears and no row was added."""
-    _wait_for_status(context, "required")
+    """Verify no new row was added after a rejected submission."""
     rows_after = _count_rows(context)
     assert rows_after == getattr(context, "rows_before_submit", rows_after), (
-        "no new customer row should appear when a required field is missing"
+        "no new customer row should appear when creation is rejected"
     )
 
 
@@ -217,6 +226,12 @@ def step_required_information(context):
     """Verify the validation message identifies the required fields."""
     status = context.driver.find_element(By.ID, "form-status")
     assert "required" in status.text.lower()
+
+
+@then("the UI identifies that the email address is invalid")
+def step_invalid_email(context):
+    """Verify the validation message says the email is not valid."""
+    _wait_for_status(context, "valid email")
 
 
 @then("the customer's address is empty")

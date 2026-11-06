@@ -116,11 +116,24 @@ def step_enter_valid_and_submit(context):
     _submit(context)
 
 
-@when("I submit the form with a missing or empty first name, last name, or email")
-def step_submit_missing(context):
-    """Leave a required field empty and submit."""
+REQUIRED_FIELD_IDS = {
+    "first name": "field-first-name",
+    "last name": "field-last-name",
+    "email": "field-email",
+}
+
+
+def _count_rows(context):
+    """Return the number of customer rows currently rendered."""
+    return len(context.driver.find_elements(By.CSS_SELECTOR, "#customers tbody tr"))
+
+
+@when("I submit the form with a missing {field}")
+def step_submit_missing(context, field):
+    """Leave the named required field empty and submit."""
     _fill_required(context)
-    context.driver.find_element(By.ID, "field-email").clear()
+    context.driver.find_element(By.ID, REQUIRED_FIELD_IDS[field]).clear()
+    context.rows_before_submit = _count_rows(context)
     _submit(context)
 
 
@@ -168,8 +181,12 @@ def step_created_successfully(context):
 
 @then("the customer is not created")
 def step_not_created(context):
-    """Verify the validation message appears instead of a create."""
+    """Verify the validation message appears and no row was added."""
     _wait_for_status(context, "required")
+    rows_after = _count_rows(context)
+    assert rows_after == getattr(context, "rows_before_submit", rows_after), (
+        "no new customer row should appear when a required field is missing"
+    )
 
 
 @then("the new customer appears in the UI")

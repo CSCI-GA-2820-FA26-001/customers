@@ -44,8 +44,10 @@ class Customer(db.Model):
             db.session.commit()
         except Exception as error:
             db.session.rollback()
-            logger.error("Error creating customer: %s", self)
-            raise DataValidationError(error) from error
+            logger.error("Error creating customer: %s: %s", self, error)
+            raise DataValidationError(
+                "Unable to create the customer with the data provided"
+            ) from error
 
     def update(self):
         """Updates a customer in the database."""
@@ -55,8 +57,10 @@ class Customer(db.Model):
             db.session.commit()
         except Exception as error:
             db.session.rollback()
-            logger.error("Error updating customer: %s", self)
-            raise DataValidationError(error) from error
+            logger.error("Error updating customer: %s: %s", self, error)
+            raise DataValidationError(
+                "Unable to update the customer with the data provided"
+            ) from error
 
     def delete(self):
         """Removes a customer from the database."""
@@ -67,8 +71,10 @@ class Customer(db.Model):
             db.session.commit()
         except Exception as error:
             db.session.rollback()
-            logger.error("Error deleting customer: %s", self)
-            raise DataValidationError(error) from error
+            logger.error("Error deleting customer: %s: %s", self, error)
+            raise DataValidationError(
+                "Unable to delete the customer with the data provided"
+            ) from error
 
     def serialize(self):
         """Serializes a customer into a dictionary."""

@@ -35,11 +35,17 @@ Feature: Create Customer UI
     And the new customer appears in the UI
     And the customer's active status is False
 
-  Scenario: Reject missing required customer details
+  Scenario Outline: Reject missing required customer details
     Given I am on the Customers admin page
-    When I submit the form with a missing or empty first name, last name, or email
+    When I submit the form with a missing <field>
     Then the customer is not created
     And the UI identifies the required information that must be provided
+
+    Examples:
+      | field      |
+      | first name |
+      | last name  |
+      | email      |
 
   Scenario: Handle an unsuccessful creation
     Given I am on the Customers admin page

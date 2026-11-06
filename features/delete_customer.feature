@@ -28,3 +28,12 @@ Feature: Delete Customer UI
     Then the UI reports that the customer could not be deleted
     And does not indicate that the customer was deleted
     And the customer remains in the list
+
+  Scenario: The deletion message clears when the list is refreshed
+    Given a customer exists in the system
+    And I am viewing the customer list
+    When I select Delete for that customer
+    And I confirm the deletion
+    Then the deletion message is shown
+    When I refresh the customer list
+    Then the deletion message is no longer shown

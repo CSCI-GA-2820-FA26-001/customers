@@ -61,6 +61,26 @@ def step_attempt_delete(context):
     _select_delete(context).accept()
 
 
+@when("I refresh the customer list")
+def step_refresh_list(context):
+    """Reload the customer list with the Refresh button."""
+    context.driver.find_element(By.ID, "refresh").click()
+
+
+@then("the deletion message is shown")
+def step_deletion_message_shown(context):
+    """Verify the deletion message is visible."""
+    assert "customer deleted" in _list_status(context)
+
+
+@then("the deletion message is no longer shown")
+def step_deletion_message_hidden(context):
+    """Verify the deletion message disappears."""
+    WebDriverWait(context.driver, TIMEOUT).until(
+        EC.invisibility_of_element_located((By.ID, "list-status"))
+    )
+
+
 @then("the customer is deleted successfully")
 def step_deleted(context):
     """Verify the confirmation named the customer and the deletion persisted."""

@@ -28,6 +28,7 @@ UPDATED = {
     "last_name": "King",
     "email": "augusta@example.com",
     "address": "9 Countess Road",
+    "active": False,
 }
 
 
@@ -172,6 +173,7 @@ def _fill_form(context, values):
     }
     for element_id, value in fields.items():
         _type(context, element_id, value)
+    _set_active(context, values.get("active", True))
 
 
 @given("a customer exists")
@@ -193,6 +195,8 @@ def step_customer_has_saved_details(context):
     assert context.customer["first_name"]
     assert context.customer["last_name"]
     assert context.customer["email"]
+    assert context.customer["address"]
+    assert context.customer["active"] is not None
 
 
 @when("I select that customer for editing")
@@ -211,6 +215,11 @@ def step_details_displayed(context):
     assert last_name.get_attribute("value") == context.customer["last_name"]
     email = context.driver.find_element(By.ID, "field-email")
     assert email.get_attribute("value") == context.customer["email"]
+    address = context.driver.find_element(By.ID, "field-address")
+    assert address.get_attribute("value") == (context.customer["address"] or "")
+    active = Select(context.driver.find_element(By.ID, "field-active"))
+    expected_active = "Active" if context.customer["active"] else "Inactive"
+    assert active.first_selected_option.text == expected_active
     assert first_name.is_enabled()
 
 
@@ -252,6 +261,8 @@ def step_updated_displayed(context):
     text = _row_text(context, context.customer)
     assert f"{UPDATED['first_name']} {UPDATED['last_name']}" in text
     assert UPDATED["email"] in text
+    assert UPDATED["address"] in text
+    assert "Inactive" in text
 
 
 @then("the saved details remain correct when I reload the page")
@@ -261,6 +272,9 @@ def step_saved_details_persist(context):
     _wait_for_row(context, UPDATED["first_name"])
     text = _row_text(context, context.customer)
     assert f"{UPDATED['first_name']} {UPDATED['last_name']}" in text
+    assert UPDATED["email"] in text
+    assert UPDATED["address"] in text
+    assert "Inactive" in text
 
 
 @then("the unsaved changes are discarded")
@@ -277,6 +291,8 @@ def step_original_unchanged(context):
     _wait_for_row(context, context.customer["first_name"])
     text = _row_text(context, context.customer)
     assert f"{context.customer['first_name']} {context.customer['last_name']}" in text
+    assert context.customer["address"] in text
+    assert "Active" in text
 
 
 @then("the UI communicates that the update was unsuccessful")

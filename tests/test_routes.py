@@ -91,7 +91,7 @@ class TestCustomerService(TestCase):
     def test_create_customer_unsupported_media_type(self):
         """It should reject requests that are not JSON."""
         response = self.client.post(
-            "/customers",
+            "/api/customers",
             data="not JSON",
             content_type="text/plain",
         )
@@ -112,7 +112,7 @@ class TestCustomerService(TestCase):
             "active": True,
         }
 
-        response = self.client.post("/customers", json=payload)
+        response = self.client.post("/api/customers", json=payload)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -126,7 +126,7 @@ class TestCustomerService(TestCase):
 
         self.assertIn("Location", response.headers)
         self.assertTrue(
-            response.headers["Location"].endswith(f"/customers/{data['id']}")
+            response.headers["Location"].endswith(f"/api/customers/{data['id']}")
         )
 
         # Verify the customer was persisted.
@@ -142,7 +142,7 @@ class TestCustomerService(TestCase):
             "email": "ada.lovelace@example.com",
         }
 
-        response = self.client.post("/customers", json=payload)
+        response = self.client.post("/api/customers", json=payload)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -165,14 +165,14 @@ class TestCustomerService(TestCase):
             "email": "ada.lovelace@example.com",
         }
 
-        response = self.client.post("/customers", json=payload)
+        response = self.client.post("/api/customers", json=payload)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Customer.query.count(), 0)
 
     def test_list_customers_empty(self):
         """It should return an empty list when no customers exist."""
-        response = self.client.get("/customers")
+        response = self.client.get("/api/customers")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.get_json(), [])
@@ -186,7 +186,7 @@ class TestCustomerService(TestCase):
             customer.create()
             customers.append(customer)
 
-        response = self.client.get("/customers")
+        response = self.client.get("/api/customers")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -207,7 +207,7 @@ class TestCustomerService(TestCase):
         CustomerFactory(first_name="Ada").create()
         CustomerFactory(first_name="Grace").create()
 
-        response = self.client.get("/customers?first_name=Ada")
+        response = self.client.get("/api/customers?first_name=Ada")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.get_json()
@@ -219,7 +219,7 @@ class TestCustomerService(TestCase):
         CustomerFactory(last_name="Smith").create()
         CustomerFactory(last_name="Jones").create()
 
-        response = self.client.get("/customers?last_name=Smith")
+        response = self.client.get("/api/customers?last_name=Smith")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.get_json()
@@ -231,7 +231,7 @@ class TestCustomerService(TestCase):
         CustomerFactory(email="ada@example.com").create()
         CustomerFactory(email="grace@example.com").create()
 
-        response = self.client.get("/customers?email=ada@example.com")
+        response = self.client.get("/api/customers?email=ada@example.com")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.get_json()
@@ -243,7 +243,7 @@ class TestCustomerService(TestCase):
         CustomerFactory(active=True).create()
         CustomerFactory(active=False).create()
 
-        response = self.client.get("/customers?active=false")
+        response = self.client.get("/api/customers?active=false")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.get_json()
@@ -254,7 +254,7 @@ class TestCustomerService(TestCase):
         """It should return an empty list when no customers match."""
         CustomerFactory(first_name="Ada").create()
 
-        response = self.client.get("/customers?first_name=Nobody")
+        response = self.client.get("/api/customers?first_name=Nobody")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.get_json(), [])
@@ -270,7 +270,7 @@ class TestCustomerService(TestCase):
         )
         customer.create()
 
-        response = self.client.get(f"/customers/{customer.id}")
+        response = self.client.get(f"/api/customers/{customer.id}")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.get_json()
@@ -283,7 +283,7 @@ class TestCustomerService(TestCase):
 
     def test_read_customer_not_found(self):
         """Return 404 if customer does not exist."""
-        response = self.client.get("/customers/99999")
+        response = self.client.get("/api/customers/99999")
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.get_json(), {"error": "Customer not found"})
@@ -302,7 +302,7 @@ class TestCustomerService(TestCase):
             "active": False,
         }
 
-        response = self.client.put(f"/customers/{customer_id}", json=updated)
+        response = self.client.put(f"/api/customers/{customer_id}", json=updated)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.get_json()
@@ -321,7 +321,7 @@ class TestCustomerService(TestCase):
     def test_update_customer_not_found(self):
         """It should return 404 when updating a customer that does not exist."""
         response = self.client.put(
-            "/customers/9999",
+            "/api/customers/9999",
             json={
                 "first_name": "Test",
                 "last_name": "User",
@@ -339,7 +339,7 @@ class TestCustomerService(TestCase):
         original_email = customer.email
 
         response = self.client.put(
-            f"/customers/{customer_id}",
+            f"/api/customers/{customer_id}",
             json={
                 "first_name": "",
                 "last_name": "User",
@@ -365,18 +365,18 @@ class TestCustomerService(TestCase):
         other_id = other.id
         original_other = other.serialize()
 
-        response = self.client.delete(f"/customers/{customer_id}")
+        response = self.client.delete(f"/api/customers/{customer_id}")
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(response.data, b"")
 
         # Verify the customer was actually deleted.
-        response = self.client.get(f"/customers/{customer_id}")
+        response = self.client.get(f"/api/customers/{customer_id}")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertIsNone(Customer.find(customer_id))
 
         # Verify the other customer was not modified.
-        response = self.client.get(f"/customers/{other_id}")
+        response = self.client.get(f"/api/customers/{other_id}")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.get_json(), original_other)
         self.assertEqual(Customer.query.count(), 1)
@@ -388,7 +388,7 @@ class TestCustomerService(TestCase):
         original = customer.serialize()
         missing_id = customer.id + 1
 
-        response = self.client.delete(f"/customers/{missing_id}")
+        response = self.client.delete(f"/api/customers/{missing_id}")
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(response.data, b"")
@@ -401,11 +401,11 @@ class TestCustomerService(TestCase):
         customer.create()
         customer_id = customer.id
 
-        response = self.client.delete(f"/customers/{customer_id}")
+        response = self.client.delete(f"/api/customers/{customer_id}")
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(response.data, b"")
 
-        response = self.client.delete(f"/customers/{customer_id}")
+        response = self.client.delete(f"/api/customers/{customer_id}")
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(response.data, b"")
         self.assertEqual(Customer.query.count(), 0)
@@ -417,7 +417,7 @@ class TestCustomerService(TestCase):
         customer_id = customer.id
         self.assertFalse(customer.active)
 
-        response = self.client.put(f"/customers/{customer_id}/activate")
+        response = self.client.put(f"/api/customers/{customer_id}/activate")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.get_json()
@@ -435,7 +435,7 @@ class TestCustomerService(TestCase):
         customer_id = customer.id
         self.assertTrue(customer.active)
 
-        response = self.client.put(f"/customers/{customer_id}/deactivate")
+        response = self.client.put(f"/api/customers/{customer_id}/deactivate")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.get_json()
@@ -448,12 +448,12 @@ class TestCustomerService(TestCase):
 
     def test_activate_customer_not_found(self):
         """It should return 404 when activating a customer that does not exist."""
-        response = self.client.put("/customers/9999/activate")
+        response = self.client.put("/api/customers/9999/activate")
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_deactivate_customer_not_found(self):
         """It should return 404 when deactivating a customer that does not exist."""
-        response = self.client.put("/customers/9999/deactivate")
+        response = self.client.put("/api/customers/9999/deactivate")
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

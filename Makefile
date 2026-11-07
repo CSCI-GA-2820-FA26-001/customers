@@ -102,7 +102,7 @@ verify: ## Verify application health and database access through ingress.
 	curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 2 --max-time 10 $(INGRESS_URL)/health
 	@echo
 	$(info Checking the database-backed Customers endpoint through ingress...)
-	curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 2 --max-time 10 $(INGRESS_URL)/customers
+	curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 2 --max-time 10 $(INGRESS_URL)/api/customers
 	@echo
 
 ############################################################

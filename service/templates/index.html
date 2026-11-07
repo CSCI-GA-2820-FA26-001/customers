@@ -225,9 +225,20 @@
       .form-status.error {
         color: #b71c1c;
       }
+      .editing-banner {
+        background: var(--indigo-50);
+        color: var(--indigo-700);
+        border-radius: 8px;
+        padding: 0.5rem 0.7rem;
+        font-size: 0.78rem;
+        margin: 0.25rem 0 0.75rem;
+      }
       .form-actions {
         display: flex;
         gap: 0.5rem;
+      }
+      tr.editing {
+        background: var(--indigo-50);
       }
 
       /* ---------- directory ---------- */
@@ -443,6 +454,9 @@
             <p class="muted">
               Create a customer or select an existing customer to edit.
             </p>
+            <p class="editing-banner" id="editing-banner" hidden>
+              Editing a customer — make changes and Save, or Cancel.
+            </p>
             <p class="muted" id="form-hint" hidden>
               Fill in the new customer's details and press Save.
             </p>
@@ -608,9 +622,9 @@
           remove.textContent = "Delete";
           remove.addEventListener("click", () => deleteCustomer(customer));
           const edit = document.createElement("button");
-          edit.className = "btn";
+          edit.className = "btn edit-btn";
           edit.textContent = "Edit";
-          edit.disabled = true;
+          edit.addEventListener("click", () => startEdit(customer));
           const toggle = document.createElement("button");
           toggle.className = "btn";
           toggle.textContent = customer.active ? "Deactivate" : "Activate";
@@ -679,6 +693,8 @@
         }
       }
 
+      let editingId = null;
+
       function setFormStatus(message, kind) {
         const status = document.getElementById("form-status");
         status.textContent = message;
@@ -694,8 +710,13 @@
 
       function resetForm() {
         document.getElementById("customer-form").reset();
+        editingId = null;
         document.getElementById("cancel-customer").hidden = true;
+        document.getElementById("editing-banner").hidden = true;
         document.getElementById("form-hint").hidden = true;
+        document
+          .querySelectorAll("#customers tbody tr.editing")
+          .forEach((row) => row.classList.remove("editing"));
       }
 
       function startCreate() {
@@ -709,8 +730,36 @@
         document.getElementById("field-first-name").focus();
       }
 
+      function startEdit(customer) {
+        editingId = customer.id;
+        document.getElementById("field-first-name").value = customer.first_name;
+        document.getElementById("field-last-name").value = customer.last_name;
+        document.getElementById("field-email").value = customer.email;
+        document.getElementById("field-address").value = customer.address || "";
+        document.getElementById("field-active").value = String(customer.active);
+        document.getElementById("editing-banner").hidden = false;
+        document.getElementById("form-hint").hidden = true;
+        document.getElementById("cancel-customer").hidden = false;
+        clearFormStatus();
+        document
+          .querySelectorAll("#customers tbody tr.editing")
+          .forEach((row) => row.classList.remove("editing"));
+        const row = document.querySelector(
+          `#customers tbody tr[data-customer-id="${customer.id}"]`
+        );
+        if (row) {
+          row.classList.add("editing");
+        }
+        document
+          .getElementById("customer-form")
+          .scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("field-first-name").focus();
+      }
+
       async function saveCustomer(event) {
         event.preventDefault();
+        const isEditing = editingId !== null;
+
         const payload = {
           first_name: document.getElementById("field-first-name").value.trim(),
           last_name: document.getElementById("field-last-name").value.trim(),
@@ -728,21 +777,35 @@
           return;
         }
 
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(payload.email)) {
+          setFormStatus("Please enter a valid email address.", "error");
+          return;
+        }
+
         try {
-          const response = await fetch("/api/customers", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+          const response = await fetch(
+            isEditing ? `/api/customers/${editingId}` : "/api/customers",
+            {
+              method: isEditing ? "PUT" : "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            }
+          );
           if (!response.ok) {
             throw new Error("Request failed with status " + response.status);
           }
           resetForm();
-          setFormStatus("Customer created.", "success");
+          setFormStatus(
+            isEditing ? "Customer updated." : "Customer created.",
+            "success"
+          );
           await loadCustomers();
         } catch (err) {
           setFormStatus(
-            "Unable to create the customer. Please try again.",
+            isEditing
+              ? "Unable to update the customer. Please try again."
+              : "Unable to create the customer. Please try again.",
             "error"
           );
         }

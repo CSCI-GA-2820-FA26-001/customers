@@ -80,6 +80,32 @@ class TestCustomerService(TestCase):
         self.assertIn("No customers available", body)
         self.assertNotIn("Reminder", body)
 
+    def test_index_customer_view(self):
+        """It should serve the customer record panel used to read a customer."""
+        response = self.client.get("/")
+
+        body = response.get_data(as_text=True)
+        self.assertIn('id="customer-view"', body)
+        self.assertIn("/api/customers/", body)
+
+    def test_index_delete_control(self):
+        """It should serve the delete control and its status message."""
+        response = self.client.get("/")
+
+        body = response.get_data(as_text=True)
+        self.assertIn('id="list-status"', body)
+        self.assertIn("delete-btn", body)
+        self.assertIn('method: "DELETE"', body)
+
+    def test_index_search_form(self):
+        """It should serve the search form that queries the list endpoint."""
+        response = self.client.get("/")
+
+        body = response.get_data(as_text=True)
+        self.assertIn('id="search-form"', body)
+        self.assertIn("/api/customers?", body)
+        self.assertIn("No matching customers were found", body)
+
     def test_health(self):
         """It should return the health status of the service."""
         response = self.client.get("/health")

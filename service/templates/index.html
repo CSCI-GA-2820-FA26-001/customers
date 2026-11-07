@@ -333,6 +333,34 @@
         font-style: italic;
         padding: 1rem 0.5rem;
       }
+      #search-status-field[hidden] {
+        display: none;
+      }
+      #customer-view[hidden] {
+        display: none;
+      }
+      #customer-view {
+        margin-bottom: 1rem;
+      }
+      #customer-view dl[hidden] {
+        display: none;
+      }
+      #customer-view dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.4rem 1.25rem;
+        margin: 0.75rem 0;
+      }
+      #customer-view dt {
+        color: var(--slate-400);
+      }
+      #customer-view dd {
+        margin: 0;
+      }
+      #view-error {
+        color: #b71c1c;
+        margin: 0.75rem 0;
+      }
       #error {
         background: #fdecea;
         border: 1px solid #f5c6cb;
@@ -405,6 +433,24 @@
           </article>
         </section>
 
+        <section class="card" id="customer-view" hidden>
+          <h2>Customer record</h2>
+          <p id="view-error" role="alert" hidden></p>
+          <dl id="view-details" hidden>
+            <dt>Customer ID</dt>
+            <dd id="view-id"></dd>
+            <dt>Name</dt>
+            <dd id="view-name"></dd>
+            <dt>Email address</dt>
+            <dd id="view-email"></dd>
+            <dt>Address</dt>
+            <dd id="view-address"></dd>
+            <dt>Account status</dt>
+            <dd id="view-status"></dd>
+          </dl>
+          <button class="btn" type="button" id="close-view">Close</button>
+        </section>
+
         <div class="panel-grid">
           <section class="card details">
             <h2>Customer details</h2>
@@ -464,34 +510,35 @@
             </div>
             <p class="muted">Browse, filter, and manage customer records.</p>
 
-            <div class="filters">
+            <form class="filters" id="search-form" novalidate>
               <label class="field">
-                First name
-                <input type="text" id="filter-first-name" />
+                Search by
+                <select id="search-attribute">
+                  <option value="first_name">First name</option>
+                  <option value="last_name">Last name</option>
+                  <option value="email">Email address</option>
+                  <option value="active">Account status</option>
+                </select>
               </label>
-              <label class="field">
-                Last name
-                <input type="text" id="filter-last-name" />
+              <label class="field" id="search-value-field">
+                Matches exactly
+                <input type="text" id="search-value" />
               </label>
-              <label class="field">
-                Email address
-                <input type="text" id="filter-email" />
-              </label>
-              <label class="field">
+              <label class="field" id="search-status-field" hidden>
                 Account status
-                <select id="filter-active">
-                  <option value="">All statuses</option>
+                <select id="search-status">
                   <option value="true">Active</option>
                   <option value="false">Inactive</option>
                 </select>
               </label>
               <div class="filter-actions">
-                <button class="btn primary" id="apply-filters">Apply filters</button>
-                <button class="btn" id="reset-filters">Reset filters</button>
+                <button class="btn primary" type="submit" id="search-submit">Search</button>
+                <button class="btn" type="button" id="search-clear">Clear search</button>
               </div>
-            </div>
+            </form>
 
             <div id="error" role="alert" hidden></div>
+            <p id="list-status" class="form-status" role="status" hidden></p>
 
             <table id="customers">
               <thead>
@@ -506,6 +553,7 @@
             </table>
 
             <p id="empty" hidden>No customers available</p>
+            <p id="no-matches" hidden>No matching customers were found</p>
 
             <div class="directory-foot">
               <span>Customer records</span>
@@ -518,6 +566,7 @@
 
     <script>
       let allCustomers = [];
+      let currentQuery = "";
 
       function setStats(customers) {
         const active = customers.filter((c) => c.active).length;
@@ -531,13 +580,19 @@
       function renderRows(customers) {
         const tbody = document.querySelector("#customers tbody");
         const empty = document.getElementById("empty");
+        const noMatches = document.getElementById("no-matches");
         tbody.innerHTML = "";
+        empty.hidden = true;
+        noMatches.hidden = true;
 
         if (customers.length === 0) {
-          empty.hidden = false;
+          if (currentQuery) {
+            noMatches.hidden = false;
+          } else {
+            empty.hidden = false;
+          }
           return;
         }
-        empty.hidden = true;
 
         for (const customer of customers) {
           const row = document.createElement("tr");
@@ -567,6 +622,16 @@
           const actionsCell = document.createElement("td");
           const actions = document.createElement("div");
           actions.className = "actions-cell";
+          const view = document.createElement("button");
+          view.className = "btn view-btn";
+          view.textContent = "View";
+          view.addEventListener("click", () => {
+            window.location.hash = `customer/${customer.id}`;
+          });
+          const remove = document.createElement("button");
+          remove.className = "btn delete-btn";
+          remove.textContent = "Delete";
+          remove.addEventListener("click", () => deleteCustomer(customer));
           const edit = document.createElement("button");
           edit.className = "btn edit-btn";
           edit.textContent = "Edit";
@@ -575,7 +640,7 @@
           toggle.className = "btn";
           toggle.textContent = customer.active ? "Deactivate" : "Activate";
           toggle.disabled = true;
-          actions.append(edit, toggle);
+          actions.append(view, edit, remove, toggle);
           actionsCell.appendChild(actions);
 
           row.append(nameCell, addressCell, statusCell, actionsCell);
@@ -583,54 +648,39 @@
         }
       }
 
-      function applyFilters(customers) {
-        const first = document
-          .getElementById("filter-first-name")
-          .value.trim()
-          .toLowerCase();
-        const last = document
-          .getElementById("filter-last-name")
-          .value.trim()
-          .toLowerCase();
-        const email = document
-          .getElementById("filter-email")
-          .value.trim()
-          .toLowerCase();
-        const active = document.getElementById("filter-active").value;
-
-        return customers.filter((c) => {
-          if (first && !c.first_name.toLowerCase().includes(first)) return false;
-          if (last && !c.last_name.toLowerCase().includes(last)) return false;
-          if (email && !c.email.toLowerCase().includes(email)) return false;
-          if (active && String(c.active) !== active) return false;
-          return true;
-        });
-      }
-
-      function refreshTable() {
-        renderRows(applyFilters(allCustomers));
+      async function fetchCustomers(query) {
+        const response = await fetch(
+          query ? `/api/customers?${query}` : "/api/customers"
+        );
+        if (!response.ok) {
+          throw new Error("Request failed with status " + response.status);
+        }
+        return response.json();
       }
 
       async function loadCustomers() {
         const error = document.getElementById("error");
         const tbody = document.querySelector("#customers tbody");
+        document.getElementById("customers").dataset.state = "loading";
+        error.hidden = true;
+        document.getElementById("list-status").hidden = true;
         try {
-          const response = await fetch("/api/customers");
-          if (!response.ok) {
-            throw new Error("Request failed with status " + response.status);
-          }
-          allCustomers = await response.json();
+          const results = await fetchCustomers(currentQuery);
+          allCustomers = currentQuery ? await fetchCustomers("") : results;
           error.hidden = true;
           setStats(allCustomers);
-          refreshTable();
+          renderRows(results);
         } catch (err) {
           allCustomers = [];
           tbody.innerHTML = "";
           document.getElementById("empty").hidden = true;
+          document.getElementById("no-matches").hidden = true;
           setStats([]);
           error.textContent =
             "Unable to load customers. Please try again later.";
           error.hidden = false;
+        } finally {
+          document.getElementById("customers").dataset.state = "ready";
         }
       }
 
@@ -766,16 +816,131 @@
       });
 
       document.getElementById("refresh").addEventListener("click", loadCustomers);
-      document.getElementById("apply-filters").addEventListener("click", refreshTable);
-      document.getElementById("reset-filters").addEventListener("click", () => {
-        document.getElementById("filter-first-name").value = "";
-        document.getElementById("filter-last-name").value = "";
-        document.getElementById("filter-email").value = "";
-        document.getElementById("filter-active").value = "";
-        refreshTable();
+      function syncSearchField() {
+        const byStatus =
+          document.getElementById("search-attribute").value === "active";
+        document.getElementById("search-value-field").hidden = byStatus;
+        document.getElementById("search-status-field").hidden = !byStatus;
+      }
+
+      document
+        .getElementById("search-attribute")
+        .addEventListener("change", syncSearchField);
+      document.getElementById("search-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const attribute = document.getElementById("search-attribute").value;
+        const value =
+          attribute === "active"
+            ? document.getElementById("search-status").value
+            : document.getElementById("search-value").value.trim();
+        currentQuery = value ? `${attribute}=${encodeURIComponent(value)}` : "";
+        loadCustomers();
+      });
+      document.getElementById("search-clear").addEventListener("click", () => {
+        document.getElementById("search-form").reset();
+        syncSearchField();
+        currentQuery = "";
+        loadCustomers();
       });
 
+      function setListStatus(message, kind) {
+        const status = document.getElementById("list-status");
+        status.textContent = message;
+        status.className = "form-status " + kind;
+        status.hidden = false;
+      }
+
+      async function deleteCustomer(customer) {
+        const name = `${customer.first_name} ${customer.last_name}`;
+        if (!window.confirm(`Delete ${name}? This cannot be undone.`)) {
+          return;
+        }
+        clearFormStatus();
+        try {
+          const response = await fetch(`/api/customers/${customer.id}`, {
+            method: "DELETE",
+          });
+          if (!response.ok) {
+            throw new Error("Request failed with status " + response.status);
+          }
+          if (window.location.hash === `#customer/${customer.id}`) {
+            window.location.hash = "";
+          }
+          await loadCustomers();
+          setListStatus("Customer deleted.", "success");
+        } catch (err) {
+          setListStatus(
+            "Unable to delete the customer. Please try again.",
+            "error"
+          );
+        }
+      }
+
+      function hideCustomerView() {
+        document.getElementById("customer-view").hidden = true;
+      }
+
+      function showCustomerViewError(message) {
+        const error = document.getElementById("view-error");
+        error.textContent = message;
+        error.hidden = false;
+        document.getElementById("view-details").hidden = true;
+        document.getElementById("customer-view").hidden = false;
+      }
+
+      function showCustomerView(customer) {
+        document.getElementById("view-id").textContent = customer.id;
+        document.getElementById("view-name").textContent =
+          `${customer.first_name} ${customer.last_name}`;
+        document.getElementById("view-email").textContent = customer.email;
+        document.getElementById("view-address").textContent =
+          customer.address === null || customer.address === undefined
+            ? "Not provided"
+            : customer.address;
+        document.getElementById("view-status").textContent = customer.active
+          ? "Active"
+          : "Inactive";
+        document.getElementById("view-error").hidden = true;
+        document.getElementById("view-details").hidden = false;
+        document.getElementById("customer-view").hidden = false;
+      }
+
+      async function loadCustomerView(customerId) {
+        try {
+          const response = await fetch(
+            `/api/customers/${encodeURIComponent(customerId)}`
+          );
+          if (response.status === 404 || response.status === 400) {
+            showCustomerViewError("Customer not found.");
+            return;
+          }
+          if (!response.ok) {
+            throw new Error("Request failed with status " + response.status);
+          }
+          showCustomerView(await response.json());
+        } catch (err) {
+          showCustomerViewError(
+            "Unable to load the customer. Please try again later."
+          );
+        }
+      }
+
+      function routeCustomerView() {
+        const match = window.location.hash.match(/^#customer\/(.+)$/);
+        if (match) {
+          loadCustomerView(match[1]);
+        } else {
+          hideCustomerView();
+        }
+      }
+
+      document.getElementById("close-view").addEventListener("click", () => {
+        window.location.hash = "";
+      });
+      window.addEventListener("hashchange", routeCustomerView);
+
       loadCustomers();
+      routeCustomerView();
     </script>
   </body>
 </html>

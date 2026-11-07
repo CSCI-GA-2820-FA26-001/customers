@@ -333,6 +333,31 @@
         font-style: italic;
         padding: 1rem 0.5rem;
       }
+      #customer-view[hidden] {
+        display: none;
+      }
+      #customer-view {
+        margin-bottom: 1rem;
+      }
+      #customer-view dl[hidden] {
+        display: none;
+      }
+      #customer-view dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.4rem 1.25rem;
+        margin: 0.75rem 0;
+      }
+      #customer-view dt {
+        color: var(--slate-400);
+      }
+      #customer-view dd {
+        margin: 0;
+      }
+      #view-error {
+        color: #b71c1c;
+        margin: 0.75rem 0;
+      }
       #error {
         background: #fdecea;
         border: 1px solid #f5c6cb;
@@ -403,6 +428,24 @@
             <span class="stat-hint">Customers marked as inactive</span>
             <span class="stat-icon">&#9202;</span>
           </article>
+        </section>
+
+        <section class="card" id="customer-view" hidden>
+          <h2>Customer record</h2>
+          <p id="view-error" role="alert" hidden></p>
+          <dl id="view-details" hidden>
+            <dt>Customer ID</dt>
+            <dd id="view-id"></dd>
+            <dt>Name</dt>
+            <dd id="view-name"></dd>
+            <dt>Email address</dt>
+            <dd id="view-email"></dd>
+            <dt>Address</dt>
+            <dd id="view-address"></dd>
+            <dt>Account status</dt>
+            <dd id="view-status"></dd>
+          </dl>
+          <button class="btn" type="button" id="close-view">Close</button>
         </section>
 
         <div class="panel-grid">
@@ -492,6 +535,7 @@
             </div>
 
             <div id="error" role="alert" hidden></div>
+            <p id="list-status" class="form-status" role="status" hidden></p>
 
             <table id="customers">
               <thead>
@@ -567,6 +611,16 @@
           const actionsCell = document.createElement("td");
           const actions = document.createElement("div");
           actions.className = "actions-cell";
+          const view = document.createElement("button");
+          view.className = "btn view-btn";
+          view.textContent = "View";
+          view.addEventListener("click", () => {
+            window.location.hash = `customer/${customer.id}`;
+          });
+          const remove = document.createElement("button");
+          remove.className = "btn delete-btn";
+          remove.textContent = "Delete";
+          remove.addEventListener("click", () => deleteCustomer(customer));
           const edit = document.createElement("button");
           edit.className = "btn edit-btn";
           edit.textContent = "Edit";
@@ -575,7 +629,7 @@
           toggle.className = "btn";
           toggle.textContent = customer.active ? "Deactivate" : "Activate";
           toggle.disabled = true;
-          actions.append(edit, toggle);
+          actions.append(view, edit, remove, toggle);
           actionsCell.appendChild(actions);
 
           row.append(nameCell, addressCell, statusCell, actionsCell);
@@ -614,6 +668,9 @@
       async function loadCustomers() {
         const error = document.getElementById("error");
         const tbody = document.querySelector("#customers tbody");
+        document.getElementById("customers").dataset.state = "loading";
+        error.hidden = true;
+        document.getElementById("list-status").hidden = true;
         try {
           const response = await fetch("/api/customers");
           if (!response.ok) {
@@ -631,6 +688,8 @@
           error.textContent =
             "Unable to load customers. Please try again later.";
           error.hidden = false;
+        } finally {
+          document.getElementById("customers").dataset.state = "ready";
         }
       }
 
@@ -775,7 +834,104 @@
         refreshTable();
       });
 
+      function setListStatus(message, kind) {
+        const status = document.getElementById("list-status");
+        status.textContent = message;
+        status.className = "form-status " + kind;
+        status.hidden = false;
+      }
+
+      async function deleteCustomer(customer) {
+        const name = `${customer.first_name} ${customer.last_name}`;
+        if (!window.confirm(`Delete ${name}? This cannot be undone.`)) {
+          return;
+        }
+        clearFormStatus();
+        try {
+          const response = await fetch(`/api/customers/${customer.id}`, {
+            method: "DELETE",
+          });
+          if (!response.ok) {
+            throw new Error("Request failed with status " + response.status);
+          }
+          if (window.location.hash === `#customer/${customer.id}`) {
+            window.location.hash = "";
+          }
+          await loadCustomers();
+          setListStatus("Customer deleted.", "success");
+        } catch (err) {
+          setListStatus(
+            "Unable to delete the customer. Please try again.",
+            "error"
+          );
+        }
+      }
+
+      function hideCustomerView() {
+        document.getElementById("customer-view").hidden = true;
+      }
+
+      function showCustomerViewError(message) {
+        const error = document.getElementById("view-error");
+        error.textContent = message;
+        error.hidden = false;
+        document.getElementById("view-details").hidden = true;
+        document.getElementById("customer-view").hidden = false;
+      }
+
+      function showCustomerView(customer) {
+        document.getElementById("view-id").textContent = customer.id;
+        document.getElementById("view-name").textContent =
+          `${customer.first_name} ${customer.last_name}`;
+        document.getElementById("view-email").textContent = customer.email;
+        document.getElementById("view-address").textContent =
+          customer.address === null || customer.address === undefined
+            ? "Not provided"
+            : customer.address;
+        document.getElementById("view-status").textContent = customer.active
+          ? "Active"
+          : "Inactive";
+        document.getElementById("view-error").hidden = true;
+        document.getElementById("view-details").hidden = false;
+        document.getElementById("customer-view").hidden = false;
+      }
+
+      async function loadCustomerView(customerId) {
+        try {
+          const response = await fetch(
+            `/api/customers/${encodeURIComponent(customerId)}`
+          );
+          if (response.status === 404 || response.status === 400) {
+            showCustomerViewError("Customer not found.");
+            return;
+          }
+          if (!response.ok) {
+            throw new Error("Request failed with status " + response.status);
+          }
+          showCustomerView(await response.json());
+        } catch (err) {
+          showCustomerViewError(
+            "Unable to load the customer. Please try again later."
+          );
+        }
+      }
+
+      function routeCustomerView() {
+        const match = window.location.hash.match(/^#customer\/(.+)$/);
+        if (match) {
+          loadCustomerView(match[1]);
+        } else {
+          hideCustomerView();
+        }
+      }
+
+      document.getElementById("close-view").addEventListener("click", () => {
+        window.location.hash = "";
+      });
+      window.addEventListener("hashchange", routeCustomerView);
+
       loadCustomers();
+      routeCustomerView();
     </script>
   </body>
 </html>

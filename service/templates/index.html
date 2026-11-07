@@ -536,7 +536,7 @@
 
             <div id="error" role="alert" hidden></div>
             <p id="list-status" class="form-status" role="status" hidden></p>
-
+            <div id="action-status" class="form-status" role="status" hidden></div>
             <table id="customers">
               <thead>
                 <tr>
@@ -628,12 +628,47 @@
           const toggle = document.createElement("button");
           toggle.className = "btn";
           toggle.textContent = customer.active ? "Deactivate" : "Activate";
-          toggle.disabled = true;
+          toggle.addEventListener("click", () => toggleCustomer(customer, toggle));
           actions.append(view, edit, remove, toggle);
           actionsCell.appendChild(actions);
 
           row.append(nameCell, addressCell, statusCell, actionsCell);
           tbody.appendChild(row);
+        }
+      }
+
+      async function toggleCustomer(customer, button) {
+        const action = customer.active ? "deactivate" : "activate";
+        const originalText = button.textContent;
+        const status = document.getElementById("action-status");
+        status.hidden = true;
+        status.textContent = "";
+
+        button.disabled = true;
+        button.textContent = "Updating...";
+
+        try {
+          const response = await fetch(
+            `/api/customers/${customer.id}/${action}`,
+            { method: "PUT" }
+          );
+
+          if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+          }
+
+          await loadCustomers();
+          status.textContent = `Customer ${action}d successfully.`;
+          status.className = "form-status success";
+          status.hidden = false;
+        } catch (error) {
+          button.disabled = false;
+          button.textContent = originalText;
+
+          const status = document.getElementById("action-status");
+          status.textContent = `Unable to ${action} customer. Please try again.`;
+          status.className = "form-status error";
+          status.hidden = false;
         }
       }
 

@@ -603,16 +603,7 @@
             throw new Error(`Request failed with status ${response.status}`);
           }
 
-          const updatedCustomer = await response.json();
-
-          allCustomers = allCustomers.map((c) =>
-            c.id === customer.id ? updatedCustomer : c
-          );
-
-          setStats(allCustomers);
-          refreshTable();
-
-          const status = document.getElementById("action-status");
+          await loadCustomers();
           status.textContent = `Customer ${action}d successfully.`;
           status.className = "form-status success";
           status.hidden = false;

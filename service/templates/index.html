@@ -535,6 +535,7 @@
             </div>
 
             <div id="error" role="alert" hidden></div>
+            <p id="list-status" class="form-status" role="status" hidden></p>
             <div id="action-status" class="form-status" role="status" hidden></div>
             <table id="customers">
               <thead>
@@ -616,6 +617,10 @@
           view.addEventListener("click", () => {
             window.location.hash = `customer/${customer.id}`;
           });
+          const remove = document.createElement("button");
+          remove.className = "btn delete-btn";
+          remove.textContent = "Delete";
+          remove.addEventListener("click", () => deleteCustomer(customer));
           const edit = document.createElement("button");
           edit.className = "btn edit-btn";
           edit.textContent = "Edit";
@@ -624,7 +629,7 @@
           toggle.className = "btn";
           toggle.textContent = customer.active ? "Deactivate" : "Activate";
           toggle.addEventListener("click", () => toggleCustomer(customer, toggle));
-          actions.append(view, edit, toggle);
+          actions.append(view, edit, remove, toggle);
           actionsCell.appendChild(actions);
 
           row.append(nameCell, addressCell, statusCell, actionsCell);
@@ -698,6 +703,9 @@
       async function loadCustomers() {
         const error = document.getElementById("error");
         const tbody = document.querySelector("#customers tbody");
+        document.getElementById("customers").dataset.state = "loading";
+        error.hidden = true;
+        document.getElementById("list-status").hidden = true;
         try {
           const response = await fetch("/api/customers");
           if (!response.ok) {
@@ -715,6 +723,8 @@
           error.textContent =
             "Unable to load customers. Please try again later.";
           error.hidden = false;
+        } finally {
+          document.getElementById("customers").dataset.state = "ready";
         }
       }
 
@@ -858,6 +868,39 @@
         document.getElementById("filter-active").value = "";
         refreshTable();
       });
+
+      function setListStatus(message, kind) {
+        const status = document.getElementById("list-status");
+        status.textContent = message;
+        status.className = "form-status " + kind;
+        status.hidden = false;
+      }
+
+      async function deleteCustomer(customer) {
+        const name = `${customer.first_name} ${customer.last_name}`;
+        if (!window.confirm(`Delete ${name}? This cannot be undone.`)) {
+          return;
+        }
+        clearFormStatus();
+        try {
+          const response = await fetch(`/api/customers/${customer.id}`, {
+            method: "DELETE",
+          });
+          if (!response.ok) {
+            throw new Error("Request failed with status " + response.status);
+          }
+          if (window.location.hash === `#customer/${customer.id}`) {
+            window.location.hash = "";
+          }
+          await loadCustomers();
+          setListStatus("Customer deleted.", "success");
+        } catch (err) {
+          setListStatus(
+            "Unable to delete the customer. Please try again.",
+            "error"
+          );
+        }
+      }
 
       function hideCustomerView() {
         document.getElementById("customer-view").hidden = true;

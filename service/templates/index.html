@@ -333,6 +333,9 @@
         font-style: italic;
         padding: 1rem 0.5rem;
       }
+      #search-status-field[hidden] {
+        display: none;
+      }
       #customer-view[hidden] {
         display: none;
       }
@@ -507,32 +510,32 @@
             </div>
             <p class="muted">Browse, filter, and manage customer records.</p>
 
-            <div class="filters">
+            <form class="filters" id="search-form" novalidate>
               <label class="field">
-                First name
-                <input type="text" id="filter-first-name" />
+                Search by
+                <select id="search-attribute">
+                  <option value="first_name">First name</option>
+                  <option value="last_name">Last name</option>
+                  <option value="email">Email address</option>
+                  <option value="active">Account status</option>
+                </select>
               </label>
-              <label class="field">
-                Last name
-                <input type="text" id="filter-last-name" />
+              <label class="field" id="search-value-field">
+                Matches exactly
+                <input type="text" id="search-value" />
               </label>
-              <label class="field">
-                Email address
-                <input type="text" id="filter-email" />
-              </label>
-              <label class="field">
+              <label class="field" id="search-status-field" hidden>
                 Account status
-                <select id="filter-active">
-                  <option value="">All statuses</option>
+                <select id="search-status">
                   <option value="true">Active</option>
                   <option value="false">Inactive</option>
                 </select>
               </label>
               <div class="filter-actions">
-                <button class="btn primary" id="apply-filters">Apply filters</button>
-                <button class="btn" id="reset-filters">Reset filters</button>
+                <button class="btn primary" type="submit" id="search-submit">Search</button>
+                <button class="btn" type="button" id="search-clear">Clear search</button>
               </div>
-            </div>
+            </form>
 
             <div id="error" role="alert" hidden></div>
             <p id="list-status" class="form-status" role="status" hidden></p>
@@ -550,6 +553,7 @@
             </table>
 
             <p id="empty" hidden>No customers available</p>
+            <p id="no-matches" hidden>No matching customers were found</p>
 
             <div class="directory-foot">
               <span>Customer records</span>
@@ -562,6 +566,7 @@
 
     <script>
       let allCustomers = [];
+      let currentQuery = "";
 
       function setStats(customers) {
         const active = customers.filter((c) => c.active).length;
@@ -575,13 +580,19 @@
       function renderRows(customers) {
         const tbody = document.querySelector("#customers tbody");
         const empty = document.getElementById("empty");
+        const noMatches = document.getElementById("no-matches");
         tbody.innerHTML = "";
+        empty.hidden = true;
+        noMatches.hidden = true;
 
         if (customers.length === 0) {
-          empty.hidden = false;
+          if (currentQuery) {
+            noMatches.hidden = false;
+          } else {
+            empty.hidden = false;
+          }
           return;
         }
-        empty.hidden = true;
 
         for (const customer of customers) {
           const row = document.createElement("tr");
@@ -637,6 +648,16 @@
         }
       }
 
+      async function fetchCustomers(query) {
+        const response = await fetch(
+          query ? `/api/customers?${query}` : "/api/customers"
+        );
+        if (!response.ok) {
+          throw new Error("Request failed with status " + response.status);
+        }
+        return response.json();
+      }
+
       async function toggleCustomer(customer, button) {
         const action = customer.active ? "deactivate" : "activate";
         const originalText = button.textContent;
@@ -672,34 +693,6 @@
         }
       }
 
-      function applyFilters(customers) {
-        const first = document
-          .getElementById("filter-first-name")
-          .value.trim()
-          .toLowerCase();
-        const last = document
-          .getElementById("filter-last-name")
-          .value.trim()
-          .toLowerCase();
-        const email = document
-          .getElementById("filter-email")
-          .value.trim()
-          .toLowerCase();
-        const active = document.getElementById("filter-active").value;
-
-        return customers.filter((c) => {
-          if (first && !c.first_name.toLowerCase().includes(first)) return false;
-          if (last && !c.last_name.toLowerCase().includes(last)) return false;
-          if (email && !c.email.toLowerCase().includes(email)) return false;
-          if (active && String(c.active) !== active) return false;
-          return true;
-        });
-      }
-
-      function refreshTable() {
-        renderRows(applyFilters(allCustomers));
-      }
-
       async function loadCustomers() {
         const error = document.getElementById("error");
         const tbody = document.querySelector("#customers tbody");
@@ -707,18 +700,16 @@
         error.hidden = true;
         document.getElementById("list-status").hidden = true;
         try {
-          const response = await fetch("/api/customers");
-          if (!response.ok) {
-            throw new Error("Request failed with status " + response.status);
-          }
-          allCustomers = await response.json();
+          const results = await fetchCustomers(currentQuery);
+          allCustomers = currentQuery ? await fetchCustomers("") : results;
           error.hidden = true;
           setStats(allCustomers);
-          refreshTable();
+          renderRows(results);
         } catch (err) {
           allCustomers = [];
           tbody.innerHTML = "";
           document.getElementById("empty").hidden = true;
+          document.getElementById("no-matches").hidden = true;
           setStats([]);
           error.textContent =
             "Unable to load customers. Please try again later.";
@@ -860,13 +851,31 @@
       });
 
       document.getElementById("refresh").addEventListener("click", loadCustomers);
-      document.getElementById("apply-filters").addEventListener("click", refreshTable);
-      document.getElementById("reset-filters").addEventListener("click", () => {
-        document.getElementById("filter-first-name").value = "";
-        document.getElementById("filter-last-name").value = "";
-        document.getElementById("filter-email").value = "";
-        document.getElementById("filter-active").value = "";
-        refreshTable();
+      function syncSearchField() {
+        const byStatus =
+          document.getElementById("search-attribute").value === "active";
+        document.getElementById("search-value-field").hidden = byStatus;
+        document.getElementById("search-status-field").hidden = !byStatus;
+      }
+
+      document
+        .getElementById("search-attribute")
+        .addEventListener("change", syncSearchField);
+      document.getElementById("search-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const attribute = document.getElementById("search-attribute").value;
+        const value =
+          attribute === "active"
+            ? document.getElementById("search-status").value
+            : document.getElementById("search-value").value.trim();
+        currentQuery = value ? `${attribute}=${encodeURIComponent(value)}` : "";
+        loadCustomers();
+      });
+      document.getElementById("search-clear").addEventListener("click", () => {
+        document.getElementById("search-form").reset();
+        syncSearchField();
+        currentQuery = "";
+        loadCustomers();
       });
 
       function setListStatus(message, kind) {

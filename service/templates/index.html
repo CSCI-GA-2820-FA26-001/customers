@@ -215,10 +215,30 @@
         font-weight: 400;
         font-size: 0.75rem;
       }
-      .placeholder-note {
-        color: var(--slate-400);
-        font-size: 0.72rem;
+      .form-status {
+        font-size: 0.85rem;
+        margin: 0.75rem 0 0;
+      }
+      .form-status.success {
+        color: var(--green-800);
+      }
+      .form-status.error {
+        color: #b71c1c;
+      }
+      .editing-banner {
+        background: var(--indigo-50);
+        color: var(--indigo-700);
+        border-radius: 8px;
+        padding: 0.5rem 0.7rem;
+        font-size: 0.78rem;
         margin: 0.25rem 0 0.75rem;
+      }
+      .form-actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+      tr.editing {
+        background: var(--indigo-50);
       }
 
       /* ---------- directory ---------- */
@@ -313,6 +333,34 @@
         font-style: italic;
         padding: 1rem 0.5rem;
       }
+      #search-status-field[hidden] {
+        display: none;
+      }
+      #customer-view[hidden] {
+        display: none;
+      }
+      #customer-view {
+        margin-bottom: 1rem;
+      }
+      #customer-view dl[hidden] {
+        display: none;
+      }
+      #customer-view dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.4rem 1.25rem;
+        margin: 0.75rem 0;
+      }
+      #customer-view dt {
+        color: var(--slate-400);
+      }
+      #customer-view dd {
+        margin: 0;
+      }
+      #view-error {
+        color: #b71c1c;
+        margin: 0.75rem 0;
+      }
       #error {
         background: #fdecea;
         border: 1px solid #f5c6cb;
@@ -356,7 +404,7 @@
         <a class="nav-item active" href="/">
           <span class="icon">&#9638;</span> Customers
         </a>
-        <a class="nav-item" href="#" title="Coming soon">
+        <a class="nav-item" href="#" id="nav-add-customer" title="Add a new customer">
           <span class="icon">&#43;</span> Add customer
         </a>
         <p class="nav-label">Management</p>
@@ -375,9 +423,7 @@
           <p class="subtitle">
             A clear view of your customer records, all in one place.
           </p>
-          <button class="btn primary" id="new-customer">
-            &#43; New customer
-          </button>
+          <button class="btn primary" id="new-customer">&#43; New customer</button>
         </header>
 
         <section class="stats">
@@ -401,10 +447,36 @@
           </article>
         </section>
 
+        <section class="card" id="customer-view" hidden>
+          <h2>Customer record</h2>
+          <p id="view-error" role="alert" hidden></p>
+          <dl id="view-details" hidden>
+            <dt>Customer ID</dt>
+            <dd id="view-id"></dd>
+            <dt>Name</dt>
+            <dd id="view-name"></dd>
+            <dt>Email address</dt>
+            <dd id="view-email"></dd>
+            <dt>Address</dt>
+            <dd id="view-address"></dd>
+            <dt>Account status</dt>
+            <dd id="view-status"></dd>
+          </dl>
+          <button class="btn" type="button" id="close-view">Close</button>
+        </section>
+
         <div class="panel-grid">
           <section class="card details">
             <h2>Customer details</h2>
-            <p class="muted">Create a customer using the form below.</p>
+            <p class="muted">
+              Create a customer or select an existing customer to edit.
+            </p>
+            <p class="editing-banner" id="editing-banner" hidden>
+              Editing a customer — make changes and Save, or Cancel.
+            </p>
+            <p class="muted" id="form-hint" hidden>
+              Fill in the new customer's details and press Save.
+            </p>
             <form id="customer-form" novalidate>
               <label class="field">
                 First name *
@@ -434,6 +506,9 @@
                 <button class="btn primary" type="submit" id="save-customer">
                   Save customer
                 </button>
+                <button class="btn" type="button" id="cancel-customer" hidden>
+                  Cancel
+                </button>
               </div>
               <p class="form-status" id="form-status" hidden></p>
             </form>
@@ -449,35 +524,36 @@
             </div>
             <p class="muted">Browse, filter, and manage customer records.</p>
 
-            <div class="filters">
+            <form class="filters" id="search-form" novalidate>
               <label class="field">
-                First name
-                <input type="text" id="filter-first-name" />
+                Search by
+                <select id="search-attribute">
+                  <option value="first_name">First name</option>
+                  <option value="last_name">Last name</option>
+                  <option value="email">Email address</option>
+                  <option value="active">Account status</option>
+                </select>
               </label>
-              <label class="field">
-                Last name
-                <input type="text" id="filter-last-name" />
+              <label class="field" id="search-value-field">
+                Matches exactly
+                <input type="text" id="search-value" />
               </label>
-              <label class="field">
-                Email address
-                <input type="text" id="filter-email" />
-              </label>
-              <label class="field">
+              <label class="field" id="search-status-field" hidden>
                 Account status
-                <select id="filter-active">
-                  <option value="">All statuses</option>
+                <select id="search-status">
                   <option value="true">Active</option>
                   <option value="false">Inactive</option>
                 </select>
               </label>
               <div class="filter-actions">
-                <button class="btn primary" id="apply-filters">Apply filters</button>
-                <button class="btn" id="reset-filters">Reset filters</button>
+                <button class="btn primary" type="submit" id="search-submit">Search</button>
+                <button class="btn" type="button" id="search-clear">Clear search</button>
               </div>
-            </div>
+            </form>
 
             <div id="error" role="alert" hidden></div>
-
+            <p id="list-status" class="form-status" role="status" hidden></p>
+            <div id="action-status" class="form-status" role="status" hidden></div>
             <table id="customers">
               <thead>
                 <tr>
@@ -491,6 +567,7 @@
             </table>
 
             <p id="empty" hidden>No customers available</p>
+            <p id="no-matches" hidden>No matching customers were found</p>
 
             <div class="directory-foot">
               <span>Customer records</span>
@@ -503,6 +580,7 @@
 
     <script>
       let allCustomers = [];
+      let currentQuery = "";
 
       function setStats(customers) {
         const active = customers.filter((c) => c.active).length;
@@ -516,16 +594,23 @@
       function renderRows(customers) {
         const tbody = document.querySelector("#customers tbody");
         const empty = document.getElementById("empty");
+        const noMatches = document.getElementById("no-matches");
         tbody.innerHTML = "";
+        empty.hidden = true;
+        noMatches.hidden = true;
 
         if (customers.length === 0) {
-          empty.hidden = false;
+          if (currentQuery) {
+            noMatches.hidden = false;
+          } else {
+            empty.hidden = false;
+          }
           return;
         }
-        empty.hidden = true;
 
         for (const customer of customers) {
           const row = document.createElement("tr");
+          row.dataset.customerId = customer.id;
 
           const nameCell = document.createElement("td");
           const name = document.createElement("div");
@@ -551,15 +636,25 @@
           const actionsCell = document.createElement("td");
           const actions = document.createElement("div");
           actions.className = "actions-cell";
+          const view = document.createElement("button");
+          view.className = "btn view-btn";
+          view.textContent = "View";
+          view.addEventListener("click", () => {
+            window.location.hash = `customer/${customer.id}`;
+          });
+          const remove = document.createElement("button");
+          remove.className = "btn delete-btn";
+          remove.textContent = "Delete";
+          remove.addEventListener("click", () => deleteCustomer(customer));
           const edit = document.createElement("button");
-          edit.className = "btn";
+          edit.className = "btn edit-btn";
           edit.textContent = "Edit";
-          edit.disabled = true;
+          edit.addEventListener("click", () => startEdit(customer));
           const toggle = document.createElement("button");
           toggle.className = "btn";
           toggle.textContent = customer.active ? "Deactivate" : "Activate";
-          toggle.disabled = true;
-          actions.append(edit, toggle);
+          toggle.addEventListener("click", () => toggleCustomer(customer, toggle));
+          actions.append(view, edit, remove, toggle);
           actionsCell.appendChild(actions);
 
           row.append(nameCell, addressCell, statusCell, actionsCell);
@@ -567,56 +662,78 @@
         }
       }
 
-      function applyFilters(customers) {
-        const first = document
-          .getElementById("filter-first-name")
-          .value.trim()
-          .toLowerCase();
-        const last = document
-          .getElementById("filter-last-name")
-          .value.trim()
-          .toLowerCase();
-        const email = document
-          .getElementById("filter-email")
-          .value.trim()
-          .toLowerCase();
-        const active = document.getElementById("filter-active").value;
-
-        return customers.filter((c) => {
-          if (first && !c.first_name.toLowerCase().includes(first)) return false;
-          if (last && !c.last_name.toLowerCase().includes(last)) return false;
-          if (email && !c.email.toLowerCase().includes(email)) return false;
-          if (active && String(c.active) !== active) return false;
-          return true;
-        });
+      async function fetchCustomers(query) {
+        const response = await fetch(
+          query ? `/api/customers?${query}` : "/api/customers"
+        );
+        if (!response.ok) {
+          throw new Error("Request failed with status " + response.status);
+        }
+        return response.json();
       }
 
-      function refreshTable() {
-        renderRows(applyFilters(allCustomers));
+      async function toggleCustomer(customer, button) {
+        const action = customer.active ? "deactivate" : "activate";
+        const originalText = button.textContent;
+        const status = document.getElementById("action-status");
+        status.hidden = true;
+        status.textContent = "";
+
+        button.disabled = true;
+        button.textContent = "Updating...";
+
+        try {
+          const response = await fetch(
+            `/api/customers/${customer.id}/${action}`,
+            { method: "PUT" }
+          );
+
+          if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+          }
+
+          await loadCustomers();
+          status.textContent = `Customer ${action}d successfully.`;
+          status.className = "form-status success";
+          status.hidden = false;
+        } catch (error) {
+          button.disabled = false;
+          button.textContent = originalText;
+
+          const status = document.getElementById("action-status");
+          status.textContent = `Unable to ${action} customer. Please try again.`;
+          status.className = "form-status error";
+          status.hidden = false;
+        }
       }
 
       async function loadCustomers() {
         const error = document.getElementById("error");
         const tbody = document.querySelector("#customers tbody");
+        document.getElementById("customers").dataset.state = "loading";
+        error.hidden = true;
+        document.getElementById("list-status").hidden = true;
         try {
-          const response = await fetch("/customers");
-          if (!response.ok) {
-            throw new Error("Request failed with status " + response.status);
-          }
-          allCustomers = await response.json();
+          const results = await fetchCustomers(currentQuery);
+          allCustomers = currentQuery ? await fetchCustomers("") : results;
           error.hidden = true;
           setStats(allCustomers);
-          refreshTable();
+          renderRows(results);
         } catch (err) {
           allCustomers = [];
           tbody.innerHTML = "";
           document.getElementById("empty").hidden = true;
+          document.getElementById("no-matches").hidden = true;
           setStats([]);
           error.textContent =
             "Unable to load customers. Please try again later.";
           error.hidden = false;
+        } finally {
+          document.getElementById("customers").dataset.state = "ready";
         }
       }
+
+      let editingId = null;
 
       function setFormStatus(message, kind) {
         const status = document.getElementById("form-status");
@@ -631,62 +748,248 @@
         status.hidden = true;
       }
 
+      function resetForm() {
+        document.getElementById("customer-form").reset();
+        editingId = null;
+        document.getElementById("cancel-customer").hidden = true;
+        document.getElementById("editing-banner").hidden = true;
+        document.getElementById("form-hint").hidden = true;
+        document
+          .querySelectorAll("#customers tbody tr.editing")
+          .forEach((row) => row.classList.remove("editing"));
+      }
+
+      function startCreate() {
+        resetForm();
+        document.getElementById("form-hint").hidden = false;
+        document.getElementById("cancel-customer").hidden = false;
+        clearFormStatus();
+        document
+          .getElementById("customer-form")
+          .scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("field-first-name").focus();
+      }
+
+      function startEdit(customer) {
+        editingId = customer.id;
+        document.getElementById("field-first-name").value = customer.first_name;
+        document.getElementById("field-last-name").value = customer.last_name;
+        document.getElementById("field-email").value = customer.email;
+        document.getElementById("field-address").value = customer.address || "";
+        document.getElementById("field-active").value = String(customer.active);
+        document.getElementById("editing-banner").hidden = false;
+        document.getElementById("form-hint").hidden = true;
+        document.getElementById("cancel-customer").hidden = false;
+        clearFormStatus();
+        document
+          .querySelectorAll("#customers tbody tr.editing")
+          .forEach((row) => row.classList.remove("editing"));
+        const row = document.querySelector(
+          `#customers tbody tr[data-customer-id="${customer.id}"]`
+        );
+        if (row) {
+          row.classList.add("editing");
+        }
+        document
+          .getElementById("customer-form")
+          .scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById("field-first-name").focus();
+      }
+
       async function saveCustomer(event) {
         event.preventDefault();
+        const isEditing = editingId !== null;
+
         const payload = {
           first_name: document.getElementById("field-first-name").value.trim(),
           last_name: document.getElementById("field-last-name").value.trim(),
           email: document.getElementById("field-email").value.trim(),
-          address: document.getElementById("field-address").value.trim() || null,
+          address:
+            document.getElementById("field-address").value.trim() || null,
           active: document.getElementById("field-active").value === "true",
         };
 
         if (!payload.first_name || !payload.last_name || !payload.email) {
-          setFormStatus("First name, last name, and email are required.", "error");
+          setFormStatus(
+            "First name, last name, and email are required.",
+            "error"
+          );
+          return;
+        }
+
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(payload.email)) {
+          setFormStatus("Please enter a valid email address.", "error");
           return;
         }
 
         try {
-          const response = await fetch("/customers", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+          const response = await fetch(
+            isEditing ? `/api/customers/${editingId}` : "/api/customers",
+            {
+              method: isEditing ? "PUT" : "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            }
+          );
           if (!response.ok) {
             throw new Error("Request failed with status " + response.status);
           }
-          document.getElementById("customer-form").reset();
-          clearFormStatus();
-          setFormStatus("Customer created.", "success");
+          resetForm();
+          setFormStatus(
+            isEditing ? "Customer updated." : "Customer created.",
+            "success"
+          );
           await loadCustomers();
         } catch (err) {
           setFormStatus(
-            "Unable to create the customer. Please try again.",
+            isEditing
+              ? "Unable to update the customer. Please try again."
+              : "Unable to create the customer. Please try again.",
             "error"
           );
         }
       }
 
+      document.getElementById("nav-add-customer").addEventListener("click", (e) => {
+        e.preventDefault();
+        startCreate();
+      });
+      document.getElementById("new-customer").addEventListener("click", startCreate);
       document
         .getElementById("customer-form")
         .addEventListener("submit", saveCustomer);
-      document.getElementById("new-customer").addEventListener("click", () => {
-        document
-          .getElementById("customer-form")
-          .scrollIntoView({ behavior: "smooth", block: "center" });
-        document.getElementById("field-first-name").focus();
-      });
-      document.getElementById("refresh").addEventListener("click", loadCustomers);
-      document.getElementById("apply-filters").addEventListener("click", refreshTable);
-      document.getElementById("reset-filters").addEventListener("click", () => {
-        document.getElementById("filter-first-name").value = "";
-        document.getElementById("filter-last-name").value = "";
-        document.getElementById("filter-email").value = "";
-        document.getElementById("filter-active").value = "";
-        refreshTable();
+      document.getElementById("cancel-customer").addEventListener("click", () => {
+        resetForm();
+        clearFormStatus();
       });
 
+      document.getElementById("refresh").addEventListener("click", loadCustomers);
+      function syncSearchField() {
+        const byStatus =
+          document.getElementById("search-attribute").value === "active";
+        document.getElementById("search-value-field").hidden = byStatus;
+        document.getElementById("search-status-field").hidden = !byStatus;
+      }
+
+      document
+        .getElementById("search-attribute")
+        .addEventListener("change", syncSearchField);
+      document.getElementById("search-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const attribute = document.getElementById("search-attribute").value;
+        const value =
+          attribute === "active"
+            ? document.getElementById("search-status").value
+            : document.getElementById("search-value").value.trim();
+        currentQuery = value ? `${attribute}=${encodeURIComponent(value)}` : "";
+        loadCustomers();
+      });
+      document.getElementById("search-clear").addEventListener("click", () => {
+        document.getElementById("search-form").reset();
+        syncSearchField();
+        currentQuery = "";
+        loadCustomers();
+      });
+
+      function setListStatus(message, kind) {
+        const status = document.getElementById("list-status");
+        status.textContent = message;
+        status.className = "form-status " + kind;
+        status.hidden = false;
+      }
+
+      async function deleteCustomer(customer) {
+        const name = `${customer.first_name} ${customer.last_name}`;
+        if (!window.confirm(`Delete ${name}? This cannot be undone.`)) {
+          return;
+        }
+        clearFormStatus();
+        try {
+          const response = await fetch(`/api/customers/${customer.id}`, {
+            method: "DELETE",
+          });
+          if (!response.ok) {
+            throw new Error("Request failed with status " + response.status);
+          }
+          if (window.location.hash === `#customer/${customer.id}`) {
+            window.location.hash = "";
+          }
+          await loadCustomers();
+          setListStatus("Customer deleted.", "success");
+        } catch (err) {
+          setListStatus(
+            "Unable to delete the customer. Please try again.",
+            "error"
+          );
+        }
+      }
+
+      function hideCustomerView() {
+        document.getElementById("customer-view").hidden = true;
+      }
+
+      function showCustomerViewError(message) {
+        const error = document.getElementById("view-error");
+        error.textContent = message;
+        error.hidden = false;
+        document.getElementById("view-details").hidden = true;
+        document.getElementById("customer-view").hidden = false;
+      }
+
+      function showCustomerView(customer) {
+        document.getElementById("view-id").textContent = customer.id;
+        document.getElementById("view-name").textContent =
+          `${customer.first_name} ${customer.last_name}`;
+        document.getElementById("view-email").textContent = customer.email;
+        document.getElementById("view-address").textContent =
+          customer.address === null || customer.address === undefined
+            ? "Not provided"
+            : customer.address;
+        document.getElementById("view-status").textContent = customer.active
+          ? "Active"
+          : "Inactive";
+        document.getElementById("view-error").hidden = true;
+        document.getElementById("view-details").hidden = false;
+        document.getElementById("customer-view").hidden = false;
+      }
+
+      async function loadCustomerView(customerId) {
+        try {
+          const response = await fetch(
+            `/api/customers/${encodeURIComponent(customerId)}`
+          );
+          if (response.status === 404 || response.status === 400) {
+            showCustomerViewError("Customer not found.");
+            return;
+          }
+          if (!response.ok) {
+            throw new Error("Request failed with status " + response.status);
+          }
+          showCustomerView(await response.json());
+        } catch (err) {
+          showCustomerViewError(
+            "Unable to load the customer. Please try again later."
+          );
+        }
+      }
+
+      function routeCustomerView() {
+        const match = window.location.hash.match(/^#customer\/(.+)$/);
+        if (match) {
+          loadCustomerView(match[1]);
+        } else {
+          hideCustomerView();
+        }
+      }
+
+      document.getElementById("close-view").addEventListener("click", () => {
+        window.location.hash = "";
+      });
+      window.addEventListener("hashchange", routeCustomerView);
+
       loadCustomers();
+      routeCustomerView();
     </script>
   </body>
 </html>

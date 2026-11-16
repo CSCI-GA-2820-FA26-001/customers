@@ -33,6 +33,9 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(config)
 
+    # Trailing slashes are not significant in the REST API
+    app.url_map.strict_slashes = False
+
     # Initialize Plugins
     # pylint: disable=import-outside-toplevel
     from service.models import db

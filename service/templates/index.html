@@ -714,8 +714,7 @@
           if (loadId !== latestLoad) {
             return;
           }
-          // Keep the last good results only when they answer the same search;
-          // rows from a different search would not match what was asked for.
+          
           if (currentQuery !== shownQuery) {
             allCustomers = [];
             document.querySelector("#customers tbody").innerHTML = "";

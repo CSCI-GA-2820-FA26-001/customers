@@ -4,7 +4,7 @@ Feature: List Customers UI
   So that I can browse and manage customer records
 
   Scenario: Display an empty customer list
-    Given no customers exist in the system
+    Given the Customers API returns no customers
     When an admin opens the Customers page
     Then the UI displays an empty customer list
     And indicates that no customers are available

@@ -25,6 +25,7 @@ CUSTOMER_SEEDS = [
         "first_name": "Alan",
         "last_name": "Turing",
         "address": "2 Bletchley Park",
+        "active": False,
     },
     {
         "first_name": "Grace",
@@ -85,14 +86,14 @@ def _wait_for_row(context, name):
     WebDriverWait(context.driver, TIMEOUT).until(_ready)
 
 
-def _row_text(context, name):
-    """Wait for and return the rendered text of the row for a customer."""
+def _row(context, name):
+    """Wait for and return the rendered row for a customer."""
 
     def _ready(driver):
         try:
             for row in driver.find_elements(By.CSS_SELECTOR, "#customers tbody tr"):
                 if name in row.text:
-                    return row.text
+                    return row
         except StaleElementReferenceException:
             return False
         return False
@@ -141,14 +142,26 @@ def step_multiple_customers_exist(context):
         context.customers.append(customer)
 
 
-@given("no customers exist in the system")
+@given("the Customers API returns no customers")
 def step_no_customers_exist(context):
-    """No test data is created; the environment must start empty.
-
-    This scenario relies on the BDD suite running against an isolated
-    database. The tests never talk to the service API or the database
-    directly, so they cannot clear records themselves.
-    """
+    """Give this browser an empty list response without changing shared data."""
+    context.driver.execute_cdp_cmd(
+        "Page.addScriptToEvaluateOnNewDocument",
+        {"source": """
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = (input, init) => {
+              const url = new URL(input, window.location.href);
+              const method = init?.method || 'GET';
+              if (url.pathname === '/api/customers' && !url.search && method === 'GET') {
+                return Promise.resolve(new Response('[]', {
+                  status: 200,
+                  headers: {'Content-Type': 'application/json'}
+                }));
+              }
+              return originalFetch(input, init);
+            };
+        """},
+    )
 
 
 @given("the Customers API is unavailable")
@@ -182,11 +195,16 @@ def step_all_customers_displayed(context):
 def step_customer_information_correct(context):
     """Verify each row shows that customer's details."""
     for customer in context.customers:
-        text = _row_text(context, customer["first_name"])
+        row = _row(context, customer["first_name"])
+        text = row.text
         assert f"{customer['first_name']} {customer['last_name']}" in text
         assert customer["email"] in text
         if customer.get("address"):
             assert customer["address"] in text
+        pill = row.find_element(By.CSS_SELECTOR, "td:nth-child(3) .pill")
+        expected_status = "Active" if customer["active"] else "Inactive"
+        assert pill.text.strip() == expected_status
+        assert expected_status.lower() in pill.get_attribute("class").split()
 
 
 @then("the UI displays an empty customer list")
@@ -194,10 +212,7 @@ def step_empty_customer_list(context):
     """Verify no rows are rendered once the table has finished loading."""
     _wait_for_list_settled(context)
     rows = context.driver.find_elements(By.CSS_SELECTOR, "#customers tbody tr")
-    assert len(rows) == 0, (
-        f"expected an empty customer list, found {len(rows)} rows; "
-        "run the BDD suite against an isolated database"
-    )
+    assert len(rows) == 0, f"expected an empty customer list, found {len(rows)} rows"
 
 
 @then("indicates that no customers are available")

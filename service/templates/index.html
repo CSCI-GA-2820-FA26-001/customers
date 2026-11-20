@@ -394,11 +394,8 @@
           <span class="icon">&#43;</span> Add customer
         </a>
         <p class="nav-label">Management</p>
-        <a class="nav-item" href="#" title="Coming soon">
+        <a class="nav-item" href="#" id="nav-search" title="Search customer records">
           <span class="icon">&#8981;</span> Search records
-        </a>
-        <a class="nav-item" href="#" title="Coming soon">
-          <span class="icon">&#9881;</span> Customer actions
         </a>
       </aside>
 
@@ -567,6 +564,8 @@
     <script>
       let allCustomers = [];
       let currentQuery = "";
+      let latestLoad = 0;
+      let shownQuery = null;
 
       function setStats(customers) {
         const active = customers.filter((c) => c.active).length;
@@ -694,28 +693,42 @@
       }
 
       async function loadCustomers() {
+        // Only the newest load may update the page; older responses are ignored.
+        const loadId = ++latestLoad;
         const error = document.getElementById("error");
-        const tbody = document.querySelector("#customers tbody");
         document.getElementById("customers").dataset.state = "loading";
         error.hidden = true;
         document.getElementById("list-status").hidden = true;
         try {
           const results = await fetchCustomers(currentQuery);
-          allCustomers = currentQuery ? await fetchCustomers("") : results;
+          const customers = currentQuery ? await fetchCustomers("") : results;
+          if (loadId !== latestLoad) {
+            return;
+          }
+          allCustomers = customers;
+          shownQuery = currentQuery;
           error.hidden = true;
           setStats(allCustomers);
           renderRows(results);
         } catch (err) {
-          allCustomers = [];
-          tbody.innerHTML = "";
-          document.getElementById("empty").hidden = true;
-          document.getElementById("no-matches").hidden = true;
-          setStats([]);
+          if (loadId !== latestLoad) {
+            return;
+          }
+          
+          if (currentQuery !== shownQuery) {
+            allCustomers = [];
+            document.querySelector("#customers tbody").innerHTML = "";
+            document.getElementById("empty").hidden = true;
+            document.getElementById("no-matches").hidden = true;
+            setStats([]);
+          }
           error.textContent =
             "Unable to load customers. Please try again later.";
           error.hidden = false;
         } finally {
-          document.getElementById("customers").dataset.state = "ready";
+          if (loadId === latestLoad) {
+            document.getElementById("customers").dataset.state = "ready";
+          }
         }
       }
 
@@ -840,6 +853,16 @@
       document.getElementById("nav-add-customer").addEventListener("click", (e) => {
         e.preventDefault();
         startCreate();
+      });
+      document.getElementById("nav-search").addEventListener("click", (e) => {
+        e.preventDefault();
+        document
+          .getElementById("search-form")
+          .scrollIntoView({ behavior: "smooth", block: "start" });
+        const byStatus = document.getElementById("search-value-field").hidden;
+        document
+          .getElementById(byStatus ? "search-status" : "search-value")
+          .focus({ preventScroll: true });
       });
       document.getElementById("new-customer").addEventListener("click", startCreate);
       document

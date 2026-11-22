@@ -677,7 +677,7 @@
             throw new Error(`Request failed with status ${response.status}`);
           }
 
-          await loadCustomers();
+          await loadCustomers(true);
           status.textContent = `Customer ${action}d successfully.`;
           status.className = "form-status success";
           status.hidden = false;
@@ -692,30 +692,37 @@
         }
       }
 
-      async function loadCustomers() {
+      // afterChange: the reload follows a create, update, delete or status
+      // change, so rows already on the page may be out of date.
+      async function loadCustomers(afterChange = false) {
         // Only the newest load may update the page; older responses are ignored.
         const loadId = ++latestLoad;
         const error = document.getElementById("error");
+        let rendered = false;
         document.getElementById("customers").dataset.state = "loading";
         error.hidden = true;
         document.getElementById("list-status").hidden = true;
         try {
           const results = await fetchCustomers(currentQuery);
+          if (loadId !== latestLoad) {
+            return;
+          }
+          // Show the search result before fetching the full list for the
+          // stats, so a failure there cannot discard it.
+          shownQuery = currentQuery;
+          renderRows(results);
+          rendered = true;
           const customers = currentQuery ? await fetchCustomers("") : results;
           if (loadId !== latestLoad) {
             return;
           }
           allCustomers = customers;
-          shownQuery = currentQuery;
-          error.hidden = true;
           setStats(allCustomers);
-          renderRows(results);
         } catch (err) {
           if (loadId !== latestLoad) {
             return;
           }
-          
-          if (currentQuery !== shownQuery) {
+          if (!rendered && (afterChange || currentQuery !== shownQuery)) {
             allCustomers = [];
             document.querySelector("#customers tbody").innerHTML = "";
             document.getElementById("empty").hidden = true;
@@ -839,7 +846,7 @@
             isEditing ? "Customer updated." : "Customer created.",
             "success"
           );
-          await loadCustomers();
+          await loadCustomers(true);
         } catch (err) {
           setFormStatus(
             isEditing
@@ -924,7 +931,7 @@
           if (window.location.hash === `#customer/${customer.id}`) {
             window.location.hash = "";
           }
-          await loadCustomers();
+          await loadCustomers(true);
           setListStatus("Customer deleted.", "success");
         } catch (err) {
           setListStatus(

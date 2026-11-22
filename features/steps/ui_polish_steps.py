@@ -11,7 +11,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from customer_ui import (
     TIMEOUT,
-    block_requests,
     create_customer,
     customer_listed,
     customer_row,
@@ -22,10 +21,12 @@ from customer_ui import (
 SLOW_DELAY_MS = 2000
 
 # Delays every fetch whose URL contains the token, then raises a flag a
-# moment after the delayed response arrives so the test knows it was handled.
+# moment after the delayed response (or failure, when fail is set) arrives
+# so the test knows it was handled.
 SLOW_FETCH_SCRIPT = """
 const token = arguments[0];
 const delay = arguments[1];
+const fail = arguments[2];
 const originalFetch = window.fetch;
 window.slowFetchDone = false;
 window.fetch = (url, options) => {
@@ -33,11 +34,31 @@ window.fetch = (url, options) => {
     return originalFetch(url, options);
   }
   return new Promise((resolve) => setTimeout(resolve, delay))
-    .then(() => originalFetch(url, options))
+    .then(() => {
+      if (fail) {
+        setTimeout(() => { window.slowFetchDone = true; }, 500);
+        throw new TypeError("Failed to fetch");
+      }
+      return originalFetch(url, options);
+    })
     .then((response) => {
       setTimeout(() => { window.slowFetchDone = true; }, 500);
       return response;
     });
+};
+"""
+
+
+# Fails only the unfiltered list request. Searches, deletes and updates still
+# reach the server. (Network.setBlockedURLs cannot do this: "*/api/customers"
+# also blocks "/api/customers?first_name=..." and "/api/customers/<id>".)
+FAIL_FULL_LIST_SCRIPT = """
+const originalFetch = window.fetch;
+window.fetch = (url, options) => {
+  if (String(url) === "/api/customers" && !(options && options.method)) {
+    return Promise.reject(new TypeError("Failed to fetch"));
+  }
+  return originalFetch(url, options);
 };
 """
 
@@ -59,7 +80,15 @@ def step_two_customers(context):
 def step_first_search_slow(context):
     """Delay, inside the browser, every request that searches for the first customer."""
     context.driver.execute_script(
-        SLOW_FETCH_SCRIPT, context.first["first_name"], SLOW_DELAY_MS
+        SLOW_FETCH_SCRIPT, context.first["first_name"], SLOW_DELAY_MS, False
+    )
+
+
+@given("searches for the first customer fail slowly")
+def step_first_search_fails_slowly(context):
+    """Delay, then fail, inside the browser, every request that searches for the first customer."""
+    context.driver.execute_script(
+        SLOW_FETCH_SCRIPT, context.first["first_name"], SLOW_DELAY_MS, True
     )
 
 
@@ -95,10 +124,16 @@ def step_searched_for_customer(context):
     customer_row(context, context.customer)
 
 
+@when("I search the list for that customer's first name")
+def step_search_for_customer(context):
+    """Search the list for the customer by first name."""
+    _search_first_name(context, context.customer["first_name"])
+
+
 @given("loading the full customer list will fail")
 def step_full_list_fails(context):
-    """Make the unfiltered list request fail in the browser; filtered requests still work."""
-    block_requests(context, "*/api/customers")
+    """Make the unfiltered list request fail in the browser; other requests still work."""
+    context.driver.execute_script(FAIL_FULL_LIST_SCRIPT)
 
 
 @then("that customer is still listed")
@@ -115,9 +150,18 @@ def step_customer_still_listed(context):
 @then("the UI shows that the customer list could not be loaded")
 def step_list_error_shown(context):
     """Verify the load error message."""
-    error = context.driver.find_element(By.ID, "error")
-    assert error.is_displayed()
+    error = WebDriverWait(context.driver, TIMEOUT).until(
+        EC.visibility_of_element_located((By.ID, "error"))
+    )
     assert "unable to load" in error.text.lower()
+
+
+@then("the UI does not show a load error")
+def step_no_load_error(context):
+    """Verify the stale failure did not show the load error."""
+    assert not context.driver.find_element(By.ID, "error").is_displayed(), (
+        "an older, failed search showed an error over the newer result"
+    )
 
 
 @when('I click "Search records" in the sidebar')

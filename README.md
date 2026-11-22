@@ -101,6 +101,34 @@ make lint
 Tests create and delete database records. Run them in the development
 environment, using a database that contains no important customer data.
 
+## Deploy to a Local Kubernetes Cluster
+
+Deploy PostgreSQL, the service, and the ingress to the local k3d cluster, then verify them:
+
+```bash
+make deploy
+make verify
+```
+
+### Upgrading an existing cluster
+
+PostgreSQL now stores its data in the `pgdata` subdirectory of its volume.
+On a cluster that already ran an earlier version, PostgreSQL starts with an
+empty database in that subdirectory. The old database files stay on the volume,
+but they are not migrated, so **existing customer data is no longer visible
+to the service**. Export any data you need before you deploy.
+
+The service creates its tables only when it starts. After `make deploy`,
+restart the customers deployment once, then verify again:
+
+```bash
+kubectl --context k3d-nyu-devops rollout restart deployment/customers
+kubectl --context k3d-nyu-devops rollout status deployment/customers
+make verify
+```
+
+Without the restart, `make verify` fails because the tables do not exist yet.
+
 ## Customer Fields
 
 | Field | Type | Description |

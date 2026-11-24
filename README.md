@@ -129,6 +129,15 @@ make verify
 
 Without the restart, `make verify` fails because the tables do not exist yet.
 
+### Database password
+
+The database password is stored in the `postgres-creds` Secret (`k8s/postgres/secret.yaml`).
+It is a development-only password for the class clusters. PostgreSQL applies it only when it
+creates a new data directory. A database that was created before this change keeps its old
+settings and still accepts logins without a password. The service still connects normally.
+To require the password on an existing k3d cluster, delete the `postgres-data-customers-db-0`
+PVC and deploy again. This deletes the local customer data.
+
 ## Customer Fields
 
 | Field | Type | Description |

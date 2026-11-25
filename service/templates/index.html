@@ -394,11 +394,8 @@
           <span class="icon">&#43;</span> Add customer
         </a>
         <p class="nav-label">Management</p>
-        <a class="nav-item" href="#" title="Coming soon">
+        <a class="nav-item" href="#" id="nav-search" title="Search customer records">
           <span class="icon">&#8981;</span> Search records
-        </a>
-        <a class="nav-item" href="#" title="Coming soon">
-          <span class="icon">&#9881;</span> Customer actions
         </a>
       </aside>
 
@@ -567,6 +564,8 @@
     <script>
       let allCustomers = [];
       let currentQuery = "";
+      let latestLoad = 0;
+      let shownQuery = null;
 
       function setStats(customers) {
         const active = customers.filter((c) => c.active).length;
@@ -678,7 +677,7 @@
             throw new Error(`Request failed with status ${response.status}`);
           }
 
-          await loadCustomers();
+          await loadCustomers(true);
           status.textContent = `Customer ${action}d successfully.`;
           status.className = "form-status success";
           status.hidden = false;
@@ -693,29 +692,50 @@
         }
       }
 
-      async function loadCustomers() {
+      // afterChange: the reload follows a create, update, delete or status
+      // change, so rows already on the page may be out of date.
+      async function loadCustomers(afterChange = false) {
+        // Only the newest load may update the page; older responses are ignored.
+        const loadId = ++latestLoad;
         const error = document.getElementById("error");
-        const tbody = document.querySelector("#customers tbody");
+        let rendered = false;
         document.getElementById("customers").dataset.state = "loading";
         error.hidden = true;
         document.getElementById("list-status").hidden = true;
         try {
           const results = await fetchCustomers(currentQuery);
-          allCustomers = currentQuery ? await fetchCustomers("") : results;
-          error.hidden = true;
-          setStats(allCustomers);
+          if (loadId !== latestLoad) {
+            return;
+          }
+          // Show the search result before fetching the full list for the
+          // stats, so a failure there cannot discard it.
+          shownQuery = currentQuery;
           renderRows(results);
+          rendered = true;
+          const customers = currentQuery ? await fetchCustomers("") : results;
+          if (loadId !== latestLoad) {
+            return;
+          }
+          allCustomers = customers;
+          setStats(allCustomers);
         } catch (err) {
-          allCustomers = [];
-          tbody.innerHTML = "";
-          document.getElementById("empty").hidden = true;
-          document.getElementById("no-matches").hidden = true;
-          setStats([]);
+          if (loadId !== latestLoad) {
+            return;
+          }
+          if (!rendered && (afterChange || currentQuery !== shownQuery)) {
+            allCustomers = [];
+            document.querySelector("#customers tbody").innerHTML = "";
+            document.getElementById("empty").hidden = true;
+            document.getElementById("no-matches").hidden = true;
+            setStats([]);
+          }
           error.textContent =
             "Unable to load customers. Please try again later.";
           error.hidden = false;
         } finally {
-          document.getElementById("customers").dataset.state = "ready";
+          if (loadId === latestLoad) {
+            document.getElementById("customers").dataset.state = "ready";
+          }
         }
       }
 
@@ -826,7 +846,7 @@
             isEditing ? "Customer updated." : "Customer created.",
             "success"
           );
-          await loadCustomers();
+          await loadCustomers(true);
         } catch (err) {
           setFormStatus(
             isEditing
@@ -841,6 +861,16 @@
         e.preventDefault();
         startCreate();
       });
+      document.getElementById("nav-search").addEventListener("click", (e) => {
+        e.preventDefault();
+        document
+          .getElementById("search-form")
+          .scrollIntoView({ behavior: "smooth", block: "start" });
+        const byStatus = document.getElementById("search-value-field").hidden;
+        document
+          .getElementById(byStatus ? "search-status" : "search-value")
+          .focus({ preventScroll: true });
+      });
       document.getElementById("new-customer").addEventListener("click", startCreate);
       document
         .getElementById("customer-form")
@@ -850,7 +880,7 @@
         clearFormStatus();
       });
 
-      document.getElementById("refresh").addEventListener("click", loadCustomers);
+      document.getElementById("refresh").addEventListener("click", () => loadCustomers());
       function syncSearchField() {
         const byStatus =
           document.getElementById("search-attribute").value === "active";
@@ -901,7 +931,7 @@
           if (window.location.hash === `#customer/${customer.id}`) {
             window.location.hash = "";
           }
-          await loadCustomers();
+          await loadCustomers(true);
           setListStatus("Customer deleted.", "success");
         } catch (err) {
           setListStatus(

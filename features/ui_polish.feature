@@ -26,6 +26,13 @@ Feature: Accurate customer list and navigation
     Then that customer is still listed
     And the UI shows that the customer list could not be loaded
 
+  Scenario: A failed refresh keeps the unfiltered list
+    Given a customer exists in the system
+    And loading the full customer list will fail
+    When I refresh the customer list
+    Then that customer is still listed
+    And the UI shows that the customer list could not be loaded
+
   Scenario: A failed full-list request keeps a new search result
     Given a customer exists in the system
     And loading the full customer list will fail

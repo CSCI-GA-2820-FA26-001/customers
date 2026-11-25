@@ -880,7 +880,7 @@
         clearFormStatus();
       });
 
-      document.getElementById("refresh").addEventListener("click", loadCustomers);
+      document.getElementById("refresh").addEventListener("click", () => loadCustomers());
       function syncSearchField() {
         const byStatus =
           document.getElementById("search-attribute").value === "active";
